@@ -88,6 +88,10 @@ def signedMax(Z1,Z2):
 
 #### ==========================================================================
 
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+
+
 def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=None):
     """
     Regression Coefficient based importance for continuous response case
@@ -103,10 +107,13 @@ def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=
     y = np.ravel(y)
 
    ## feature importance ------------------------------------
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
     Model = (ElasticNetCV(l1_ratio=[0.1,0.5,0.95],random_state=seedCV))
     Model.fit(pd.concat([X,X_knockoff],axis=1),y)
         # not valid for categorical y, use different statistic accordingly
         # combined data is n*2p , so need n>=2p for identifiability
+    warnings.filterwarnings("default", category=ConvergenceWarning)
+
     W = Model.coef_
 
     Z = np.abs(W[:p])
@@ -129,9 +136,12 @@ def basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax):
     names = X.columns
     X_knockoff = pd.get_dummies(X_knockoff, drop_first=True)
    ## feature importance ------------------------------------
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
     Model = LogisticRegression()
     Model.fit(pd.concat([X,X_knockoff],axis=1),y)
         # Just linear regression is replaced by Logistic regression
+    warnings.filterwarnings("default", category=ConvergenceWarning)
+
     W = Model.coef_[0]
 
     Z = np.abs(W[:p])
@@ -200,6 +210,7 @@ def LOFO_ImpCategorical(X,X_knockoff,y,FDR=0.1,seed=None,take_diff=True,Scoring=
         Xcombined_train, Xcombined_test, y_train, y_test = train_test_split(Xcombined, y , test_size=0.4,random_state=seed if (seed is None) else (seed+i))
         if (y_train.nunique()==k) and (y_test.nunique()==k) : break
 
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
     lofoModel = LogisticRegression()
     lofoScore = []
         # when k(>2) categories are there in response, there will be k-1 coefficients corresponding to each feature if we use Multinomial Logistic Model. So we can not use coefficient based methods here for scoring
@@ -215,6 +226,7 @@ def LOFO_ImpCategorical(X,X_knockoff,y,FDR=0.1,seed=None,take_diff=True,Scoring=
         fullModel.fit(Xcombined_train,y_train)
         fullScore = log_loss(y_test,fullModel.predict_proba(Xcombined_test))
         W -= fullScore # entry can be negative when there is over fitting
+    warnings.filterwarnings("default", category=ConvergenceWarning)
 
     W = W.reshape((2,-1))
     Z = W[0]
