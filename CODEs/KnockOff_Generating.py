@@ -23,7 +23,8 @@ from Basics import *
 
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.model_selection import GridSearchCV ,RepeatedStratifiedKFold,RepeatedKFold
-
+import warnings
+from sklearn.exceptions import ConvergenceWarning
 
 def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
     X = pd.DataFrame(X).copy()
@@ -41,6 +42,7 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
 
    ## sequencing over columns ---------------------------------
     np.random.seed(seed_for_sample)
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
     for j in range(p) :
         name = names[j]
         Xj = X[name] # response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
@@ -74,7 +76,8 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
              Xj_copy = np.random.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
-
+        
+    warnings.filterwarnings("default", category=ConvergenceWarning)
 
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
@@ -83,9 +86,9 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
 
 # modified Sequential Knockoff ++++++++++++++++++++++++++++++++++++++++++++++++
 '''
- * It appears that as we move from first feature to last feature , we are modelling the conditional distribution Xj|(X[-j],X_knockoff[1:j-1]) based on larger data available. So there can be systematic bias in quality.
- * To address this problem , split the data in a few blocks , shuffle the order of columns in each block , generate Sequential Knockoff as usual , then reshuffle them back to original order. Finally stack them together as the beginning
- * The trade-off here is , for large number of blocks , it will handle the bias better. But in each block we are fitting the model based on less number of observations, so less the precision.
+ ** It appears that as we move from first feature to last feature , we are modelling the conditional distribution Xj|(X[-j],X_knockoff[1:j-1]) based on larger data available. So there can be systematic bias in quality.
+ ** To address this problem , split the data in a few blocks , shuffle the order of columns in each block , generate Sequential Knockoff as usual , then reshuffle them back to original order. Finally stack them together as the beginning
+ ** The trade-off here is , for large number of blocks , it will handle the bias better. But in each block we are fitting the model based on less number of observations, so less the precision.
 
 '''
 
