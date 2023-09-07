@@ -23,7 +23,7 @@ from multiprocessing import cpu_count
 
 #### Generating Multiple KnockOff copies at a time ============================
 
-def genMulti(X,n_copy,method=sKnockOff_Modified,scaling=True):
+def genMulti(X, n_copy, method=sKnockOff_Modified, scaling=True):
     """
     Generates multiple KnockOff copies of a same DataMatrix.
 
