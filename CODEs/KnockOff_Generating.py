@@ -63,7 +63,7 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
              categories = Model.classes_
              probabilities = pd.DataFrame(Model.predict_proba(Xcombined_j),index=idx)
             #> new sample .................................
-             Xj_copy = probabilities.apply(lambda x : list(np.random.multinomial(1,x)).index(1),axis=1)
+             Xj_copy = probabilities.apply(lambda x : list(multinomial(1,x)).index(1),axis=1)
              Xj_copy = categories[Xj_copy]
 
         else :
@@ -73,7 +73,7 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
              Xj_copy = Model.predict(Xcombined_j)
              s = np.std(Xj-Xj_copy)
             #> new sample ..................................
-             Xj_copy = np.random.normal(Xj_copy,s)
+             Xj_copy = normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
         
