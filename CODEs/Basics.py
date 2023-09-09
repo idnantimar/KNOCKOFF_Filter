@@ -107,7 +107,7 @@ def simulateIndependent(n_obs,col_type,NUM=lambda size: normal(0,1,size),CAT=lam
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def simulateJoint(n_obs,popln=lambda size: multivariate_normal([0,0], [[1, 0], [0, 1]],size)):
+def simulateJoint(n_obs,popln=lambda size: multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)):
     """
     A function to simulate a DataMatrix from a joint-distribution specified.
 
@@ -115,7 +115,7 @@ def simulateJoint(n_obs,popln=lambda size: multivariate_normal([0,0], [[1, 0], [
     ----------
     n_obs : int
         Number of observations per column.
-    popln : a function mentioning the joint distribution of the columns ; default is lambda size: multivariate_normal([0,0], [[1, 0], [0, 1]],size)
+    popln : a function mentioning the joint distribution of the columns ; default is lambda size: multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)
 
     Returns
     -------
