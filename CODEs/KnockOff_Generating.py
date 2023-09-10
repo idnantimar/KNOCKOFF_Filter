@@ -26,13 +26,42 @@ from sklearn.model_selection import GridSearchCV ,RepeatedStratifiedKFold,Repeat
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
-def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
+def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
+        """
+    Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
+
+    Parameters
+    ----------
+    X : DataFrame or 2D-array ; size=(n,p)
+        The DataMatrix whose KnockOff copy is required to be generated.
+
+    is_Cat : list or array of True/False values ; length=p
+        Each element determines whether the corresponding column of X is of Categorical(True) or Numerical(False) type.
+
+    scaling : bool ; default False
+        Whether the numerical columns of X will be standardized before further calculation.
+
+    seed_for_sample, seed_for_KernelTrick, seed_for_CV : int ; default None
+        Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
+
+
+    Returns
+    -------
+    tuple in the form (X,X_knockoff)
+        1st element is the DataMatrix (after scaling, if any) ;
+        Last element is the corresponding KnockOff copy
+
+    """
+
     X = pd.DataFrame(X).copy()
     n,p = X.shape
     names = X.columns
     idx = X.index
     X.rename(columns={name:str(name) for name in names},inplace=True)
     names = X.columns # making sure the col names are string , not int
+
+   ## standardizing continuous columns ------------------------
+    if scaling : Scale_Numeric(X,is_Cat)
 
    ## initialize KnockOff copy --------------------------------
     X_knockoff = pd.DataFrame(index=idx)
@@ -88,7 +117,6 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
 '''
  ** It appears that as we move from first feature to last feature , we are modelling the conditional distribution Xj|(X[-j],X_knockoff[1:j-1]) based on larger data available. So there can be systematic bias in quality.
  ** To address this problem , split the data in a few blocks , shuffle the order of columns in each block , generate Sequential Knockoff as usual , then reshuffle them back to original order. Finally stack them together as the beginning
- ** The trade-off here is , for large number of blocks , it will handle the bias better. But in each block we are fitting the model based on less number of observations, so less the precision.
 
 '''
 
@@ -96,31 +124,9 @@ def sKnockOff(X, is_Cat, seed_for_sample=None, seed_for_KernelTrick=None, seed_f
 
 def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
     """
-    It appears that, as we move from first feature to last feature in 'Sequential Knockoff', we are modelling the conditional distribution Xj|(X[-j],X_knockoff[1:j-1]) based on larger data available. So there can be systematic bias in quality.
-
-    To address this problem, this function splits the data in a 3 blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
-    Hence, overall such bias should cancel-out each other for different blocks.
-
-    Parameters
-    ----------
-    X : DataFrame or 2D-array ; size=(n,p)
-        The DataMatrix whose KnockOff copy is required to be generated.
-
-    is_Cat : list or array of True/False values ; length=p
-        Each element determines whether the corresponding column of X is of Categorical(True) or Numerical(False) type.
-
-    scaling : bool ; default False
-        Whether the numerical columns of X will be standardized before further calculation.
-
-    seed_for_randomizing, seed_for_sample, seed_for_KernelTrick, seed_for_CV : int ; default None
-        Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
-
-
-    Returns
-    -------
-    tuple in the form (X,X_knockoff)
-        1st element is the DataMatrix (after scaling, if any) ;
-        Last element is the corresponding KnockOff copy
+    This function splits the data in a 3 blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
+    
+    WARNING: takes too much time than ogiginal sKnockOff method.
 
     """
     X = pd.DataFrame(X).copy()
@@ -153,15 +159,15 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed
    ## blockwise knockoff generation ---------------------------
     # Block1:-
     Block1,is_Cat1 = Shuffle(Block1)
-    Block1,Block1_knockoff = sKnockOff(Block1, is_Cat1 , seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block1,Block1_knockoff = sKnockOff(Block1, is_Cat1, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
     Block1,Block1_knockoff = ShuffleBack(Block1, Block1_knockoff)
     # Block2:-
     Block2,is_Cat2 = Shuffle(Block2)
-    Block2,Block2_knockoff = sKnockOff(Block2, is_Cat2 , seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block2,Block2_knockoff = sKnockOff(Block2, is_Cat2, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
     Block2,Block2_knockoff = ShuffleBack(Block2, Block2_knockoff)
     # Block3:-
     Block3,is_Cat3 = Shuffle(Block3)
-    Block3,Block3_knockoff = sKnockOff(Block3, is_Cat3 , seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block3,Block3_knockoff = sKnockOff(Block3, is_Cat3, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
     Block3,Block3_knockoff = ShuffleBack(Block3, Block3_knockoff)
 
    ## combining blocks -----------------------------------------
