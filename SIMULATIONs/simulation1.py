@@ -143,7 +143,7 @@ for p_ in [20,50,80,150]:
 
     D = pd.melt(D,ignore_index=False)
     D.rename(columns={'variable':'sKnockOff'},inplace=True)
-    sns.lineplot(x=D.index,y='value',hue='sKnockOff',data=D,palette=['green','red'])
+    sns.lineplot(x=D.index,y='value',hue='sKnockOff',data=D,palette=['green','red']).set_xticks(range(0,p_,p_//10))
     plt.ylabel('avg. pairwise corr')
     plt.xlabel('column index ')
     plt.title('n_cols='+str(p_))
