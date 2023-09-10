@@ -57,6 +57,7 @@ from time import time
 Scores = lambda data, method : list(map(method,data))
 n_itr = 10
 n_knockoff = 12
+n_obs = 200
 DATA = {"without_randomization":{'p_'+str(p_): {} for p_ in [20,50,80,150]},
         "with_randomization":{'p_'+str(p_): {} for p_ in [20,50,80,150]}}
 SCORESMed_KNN = {'p_'+str(p_): pd.DataFrame(index=["without_randomization","with_randomization"]) for p_ in [20,50,80,150]}
@@ -66,7 +67,7 @@ TIME_KNN = {'p_'+str(p_): pd.DataFrame(columns=["without_randomization","with_ra
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 for itr in range(n_itr):
-    X_Full = simulateIndependent(200,(150,0))
+    X_Full = simulateIndependent(n_obs,(150,0))
     for p_ in [20,50,80,150]:
         ## Data | p_  ...........................................
         t = time()
