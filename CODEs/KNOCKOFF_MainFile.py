@@ -23,7 +23,7 @@ from multiprocessing import cpu_count
 
 #### Generating Multiple KnockOff copies at a time ============================
 
-def genMulti(X, n_copy, method=sKnockOff_Modified, scaling=True):
+def genMulti(X, n_copy, method=sKnockOff, scaling=True):
     """
     Generates multiple KnockOff copies of a same DataMatrix.
 
@@ -35,7 +35,7 @@ def genMulti(X, n_copy, method=sKnockOff_Modified, scaling=True):
     n_copy : int
         Number of copies to be generated.
 
-    method : A function that creates X_knockoff ; default sKnockOff_Modified
+    method : A function that creates X_knockoff ; default sKnockOff
         This function should take input -
             * X : DataMatrix
             * is_Cat : an array indicating which column is Categorical(True) , which one is Numerical(False)
@@ -73,7 +73,7 @@ def genMulti(X, n_copy, method=sKnockOff_Modified, scaling=True):
 #
 #### KnockOff Filter ==========================================================
 
-def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff_Modified, Xs_Xknockoffs = False, impStat = basicImp_ContinuousResponse, n_aggregate = 30, acceptance_rate = 0.75, plotting = True, plot_Threshold = True, plot_Legend = True, trueBeta_for_FDP = None, appendTitle = ''):
+def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, impStat = basicImp_ContinuousResponse, n_aggregate = 30, acceptance_rate = 0.75, plotting = True, plot_Threshold = True, plot_Legend = True, trueBeta_for_FDP = None, appendTitle = ''):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -91,7 +91,7 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff_Modified, Xs_Xknockoffs 
     FDR : float between [0,1] or list of such float values ; default 0.1
         The False Discovery Rate upperbound to be specified.
 
-    method : any function that creates X_knockoff ; default sKnockOff_Modified ; not needed if Xs_Xknockoffs=True
+    method : any function that creates X_knockoff ; default sKnockOff ; not needed if Xs_Xknockoffs=True
         This function should take input-
             * X : DataMatrix
             * is_Cat : an array indicating which column is Categorical(True) , which one is Numerical(False)
