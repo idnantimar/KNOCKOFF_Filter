@@ -67,82 +67,25 @@ TIME_KNN = {'p_'+str(p_): pd.DataFrame(columns=["without_randomization","with_ra
 
 for itr in range(n_itr):
     X_Full = simulateIndependent(200,(150,0))
+    for p_ in [20,50,80,150]:
+        ## Data | p_  ...........................................
+        t = time()
+        Data_withoutModification = genMulti(X_Full.iloc[:,:p_],n_knockoff,method=sKnockOff)
+        TIME_KNN['p_'+str(p_)].loc[itr,'without_randomization'] = time() - t
+        t = time()
+        Data_withModification = genMulti(X_Full.iloc[:,:p_],n_knockoff,method=sKnockOff_Modified)
+        TIME_KNN['p_'+str(p_)].loc[itr,'with_randomization'] = time() - t
+        DATA['without_randomization']['p_'+str(p_)]['itr'+str(itr)] = Data_withoutModification
+        DATA['with_randomization']['p_'+str(p_)]['itr'+str(itr)] = Data_withModification
 
-    ## Data | p = 150 ..........................................
-    t = time()
-    Data150_withoutModification = genMulti(X_Full,n_knockoff,method=sKnockOff)
-    TIME_KNN['p_150'].loc[itr,'without_randomization'] = time() - t
-    t = time()
-    Data150_withModification = genMulti(X_Full,n_knockoff,method=sKnockOff_Modified)
-    TIME_KNN['p_150'].loc[itr,'with_randomization'] = time() - t
-    DATA['without_randomization']['p_150']['itr'+str(itr)] = Data150_withoutModification
-    DATA['with_randomization']['p_150']['itr'+str(itr)] = Data150_withModification
-
-    scores150_KNN = pd.DataFrame({"without_randomization":Scores(Data150_withoutModification,KNN_checkQuality),
-                  "with_randomization":Scores(Data150_withModification,KNN_checkQuality)})
-    SCORESMed_KNN['p_150'] = SCORESMed_KNN['p_150'].join(pd.Series(scores150_KNN.median(),name=('itr'+str(itr))))
-    sns.boxplot(data=scores150_KNN,palette=['red','green'])
-    plt.ylabel('KNN scores')
-    plt.title("Itr_"+str(itr)+" | n_cols=150")
-    plt.show()
-
-
-    ## Data | p = 80 ..........................................
-    t = time()
-    Data80_withoutModification = genMulti(X_Full.iloc[:,:80],n_knockoff,method=sKnockOff)
-    TIME_KNN['p_80'].loc[itr,'without_randomization'] = time() - t
-    t = time()
-    Data80_withModification = genMulti(X_Full.iloc[:,:80],n_knockoff,method=sKnockOff_Modified)
-    TIME_KNN['p_80'].loc[itr,'with_randomization'] = time() - t
-    DATA['without_randomization']['p_80']['itr'+str(itr)] = Data80_withoutModification
-    DATA['with_randomization']['p_80']['itr'+str(itr)] = Data80_withModification
-
-    scores80_KNN = pd.DataFrame({"without_randomization":Scores(Data80_withoutModification,KNN_checkQuality),
-                  "with_randomization":Scores(Data80_withModification,KNN_checkQuality)})
-    SCORESMed_KNN['p_80'] = SCORESMed_KNN['p_80'].join(pd.Series(scores80_KNN.median(),name=('itr'+str(itr))))
-    sns.boxplot(data=scores80_KNN,palette=['red','green'])
-    plt.ylabel('KNN scores')
-    plt.title("Itr_"+str(itr)+" | n_cols=80")
-    plt.show()
-
-
-    ## Data | p = 50 ...........................................
-    t = time()
-    Data50_withoutModification = genMulti(X_Full.iloc[:,:50],n_knockoff,method=sKnockOff)
-    TIME_KNN['p_50'].loc[itr,'without_randomization'] = time() - t
-    t = time()
-    Data50_withModification = genMulti(X_Full.iloc[:,:50],n_knockoff,method=sKnockOff_Modified)
-    TIME_KNN['p_50'].loc[itr,'with_randomization'] = time() - t
-    DATA['without_randomization']['p_50']['itr'+str(itr)] = Data50_withoutModification
-    DATA['with_randomization']['p_50']['itr'+str(itr)] = Data50_withModification
-
-    scores50_KNN = pd.DataFrame({"without_randomization":Scores(Data50_withoutModification,KNN_checkQuality),
-                  "with_randomization":Scores(Data50_withModification,KNN_checkQuality)})
-    SCORESMed_KNN['p_50'] = SCORESMed_KNN['p_50'].join(pd.Series(scores50_KNN.median(),name=('itr'+str(itr))))
-    sns.boxplot(data=scores50_KNN,palette=['red','green'])
-    plt.ylabel('KNN scores')
-    plt.title("Itr_"+str(itr)+" | n_cols=50")
-    plt.show()
-
-
-    ## Data | p = 20 ...........................................
-    t = time()
-    Data20_withoutModification = genMulti(X_Full.iloc[:,:20],n_knockoff,method=sKnockOff)
-    TIME_KNN['p_20'].loc[itr,'without_randomization'] = time() - t
-    t = time()
-    Data20_withModification = genMulti(X_Full.iloc[:,:20],n_knockoff,method=sKnockOff_Modified)
-    TIME_KNN['p_20'].loc[itr,'with_randomization'] = time() - t
-    DATA['without_randomization']['p_20']['itr'+str(itr)] = Data20_withoutModification
-    DATA['with_randomization']['p_20']['itr'+str(itr)] = Data20_withModification
-
-    scores20_KNN = pd.DataFrame({"without_randomization":Scores(Data20_withoutModification,KNN_checkQuality),
-                  "with_randomization":Scores(Data20_withModification,KNN_checkQuality)})
-    SCORESMed_KNN['p_20'] = SCORESMed_KNN['p_20'].join(pd.Series(scores20_KNN.median(),name=('itr'+str(itr))))
-    sns.boxplot(data=scores20_KNN,palette=['red','green'])
-    plt.ylabel('KNN scores')
-    plt.title("Itr_"+str(itr)+" | n_cols=20")
-    plt.show()
-
+        scores_KNN = pd.DataFrame({"without_randomization":Scores(Data_withoutModification,KNN_checkQuality),
+                      "with_randomization":Scores(Data_withModification,KNN_checkQuality)})
+        SCORESMed_KNN['p_'+str(p_)] = SCORESMed_KNN['p_'+str(p_)].join(pd.Series(scores_KNN.median(),name=('itr'+str(itr))))
+        sns.boxplot(data=scores_KNN,palette=['red','green'])
+        plt.axhline(y=0.5,color='black',linestyle='dashed')
+        plt.ylabel('KNN scores')
+        plt.title("Itr_"+str(itr)+" | n_cols="+str(p_))
+        plt.show()
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 from scipy.stats import wilcoxon
