@@ -16,30 +16,50 @@ from KNOCKOFF_MainFile import *
 
 
 
-#### KNN based diagnostic of the quality of Knockoff ==========================
+#### MMD based diagnostic of the quality of Knockoff ==========================
 
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import pairwise_distances
+from random import randint
 
 
-def KNN_checkQuality(XandX_knockoff):
+def Dist_Z1Z2(Z1,Z2=None):
+    #  estimates E|Z1-Z2| , where Z1 & Z2 are two independent random variables
+    # Inputs are two DataMatrix corresponding to Z1 & Z2 observations respectively
+    dist = pairwise_distances(Z1,Z2)
+    np.fill_diagonal(dist ,0)
+    return np.mean(dist)
+
+
+MMD_score = lambda Z1,Z2 : Dist_Z1Z2(Z1) + Dist_Z1Z2(Z2) - 2*Dist_Z1Z2(Z1,Z2)
+
+
+
+
+def MMD_checkQuality(XandX_knockoff , n_partialSwap = 10):
     """
-    Check the proportion that in the combined data of X & X_knockoff , the nearest neighbour of an observation is from the same group (i.e. if original obs is from X , nearest neighbour is also from X).
-    * Ideally this proportion should be 1/2 .
-    * A proportion very much >1/2 indicates the generated knockoff copy does not mimic the original data well.
-    * A proportion very much <1/2 indicates the generated knockoff copy may overfit the original data. In extreme case when X=X_knockoff , this proportion = 0 .
+    let LHS = [X,X_knockoff]
+        RHS = anySwap(LHS)
+        Dist_Z1Z2 = estimated_E|Z1-Z2| , where Z1 & Z2 are two independent random variables
+
+    If the knockoff copy is of good quality, LHS & RHS should be identically distributed.
+        MMD_score = Dist_Z1Z2(LHS,LHS) + Dist_Z1Z2(RHS,RHS) - 2*Dist_Z1Z2(LHS,RHS)  , should be near 0 in such case. The further this score from 0 , it says the knockoff fails to mimic the original data.
     """
     X,X_knockoff = XandX_knockoff
     n,p = X.shape
-    combinedData = pd.DataFrame(np.vstack((X.to_numpy(),X_knockoff.to_numpy())))
-    target = np.array([0]*n + [1]*n)    # label of the target class
+    LHS = pd.concat([X,X_knockoff],axis=1)
+    fullSwap = lambda : pd.concat([X_knockoff,X],axis=1)
+    def partialSwap():
+        col_ix = np.array(range(2*p))
+        swappable = choice(range(p),size=randint(1,p),replace=False)
+        col_ix[swappable] += p
+        col_ix[(swappable+p)] -= p
+        return LHS.iloc[:,col_ix]
 
-    knn_classifier = KNeighborsClassifier(n_neighbors=1)
-    knn_classifier.fit(combinedData, target)
-    ix = knn_classifier.kneighbors()[1]    # index on nearest neighbour
-    ix = np.ravel(ix//n)     # label of the target class of nearest neighbour
+    score = [MMD_score(LHS,fullSwap())]
+    for _ in range(n_partialSwap):
+        score += [MMD_score(LHS,partialSwap())]
 
-    return np.mean(ix==target)
-
+    return np.mean(score)
 
 
 
@@ -60,8 +80,8 @@ n_knockoff = 12
 n_obs = 200
 DATA = {"without_randomization":{'p_'+str(p_): {} for p_ in [20,50,80,150]},
         "with_randomization":{'p_'+str(p_): {} for p_ in [20,50,80,150]}}
-SCORESMed_KNN = {'p_'+str(p_): pd.DataFrame(index=["without_randomization","with_randomization"]) for p_ in [20,50,80,150]}
-TIME_KNN = {'p_'+str(p_): pd.DataFrame(columns=["without_randomization","with_randomization"],index=range(n_itr)) for p_ in [20,50,80,150]}
+SCORESMed = {'p_'+str(p_): pd.DataFrame(index=["without_randomization","with_randomization"]) for p_ in [20,50,80,150]}
+TIME = {'p_'+str(p_): pd.DataFrame(columns=["without_randomization","with_randomization"],index=range(n_itr)) for p_ in [20,50,80,150]}
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -72,41 +92,48 @@ for itr in range(n_itr):
         ## Data | p_  ...........................................
         t = time()
         Data_withoutModification = genMulti(X_Full.iloc[:,:p_],n_knockoff,method=sKnockOff)
-        TIME_KNN['p_'+str(p_)].loc[itr,'without_randomization'] = time() - t
+        TIME['p_'+str(p_)].loc[itr,'without_randomization'] = time() - t
         t = time()
         Data_withModification = genMulti(X_Full.iloc[:,:p_],n_knockoff,method=sKnockOff_Modified)
-        TIME_KNN['p_'+str(p_)].loc[itr,'with_randomization'] = time() - t
+        TIME['p_'+str(p_)].loc[itr,'with_randomization'] = time() - t
         DATA['without_randomization']['p_'+str(p_)]['itr'+str(itr)] = Data_withoutModification
         DATA['with_randomization']['p_'+str(p_)]['itr'+str(itr)] = Data_withModification
 
-        scores_KNN = pd.DataFrame({"without_randomization":Scores(Data_withoutModification,KNN_checkQuality),
-                      "with_randomization":Scores(Data_withModification,KNN_checkQuality)})
-        SCORESMed_KNN['p_'+str(p_)] = SCORESMed_KNN['p_'+str(p_)].join(pd.Series(scores_KNN.median(),name=('itr'+str(itr))))
-        sns.boxplot(data=scores_KNN,palette=['red','green'])
-        plt.axhline(y=0.5,color='black',linestyle='dashed')
-        plt.ylabel('KNN scores')
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+for itr in range(n_itr):
+    for p_ in [20,50,80,150]:
+        ## Data | p_  ...........................................
+        Data_withoutModification = DATA['without_randomization']['p_'+str(p_)]['itr'+str(itr)]
+        Data_withModification = DATA['with_randomization']['p_'+str(p_)]['itr'+str(itr)]
+        scores = pd.DataFrame({"without_randomization":Scores(Data_withoutModification,MMD_checkQuality),
+                      "with_randomization":Scores(Data_withModification,MMD_checkQuality)})
+        SCORESMed['p_'+str(p_)]['itr'+str(itr)] = scores.median()
+        sns.boxplot(data=scores,palette=['red','green'])
+        plt.axhline(color='black',linestyle='dashed')
+        plt.ylabel('MMD scores')
         plt.title("Itr_"+str(itr)+" | n_cols="+str(p_))
         plt.show()
 
 
-
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 from scipy.stats import wilcoxon
 P_Vals = pd.Series(name='Signed-Rank Test',dtype=float,index=['p_20','p_50','p_80','p_150'])
 
 p_ = ['20','50','80','150']
 for col in p_ :
-    D = SCORESMed_KNN['p_'+col].T
+    D = SCORESMed['p_'+col].T
     Red = D.without_randomization
     Green = D.with_randomization
-    stat, p_value = wilcoxon(Red, Green,zero_method='pratt')
+    stat, p_value = wilcoxon(Red, Green,zero_method='pratt',alternative='greater')
+        # perform one-sided Wilcoxon Signed-Rank test for "modififed method performs better"
     P_Vals['p_'+col] = p_value
     D = pd.melt(D,ignore_index=False)
     D.rename(columns={'variable':'sKnockOff'},inplace=True)
     sns.lineplot(x=D.index,y='value',hue='sKnockOff',data=D,palette=['red','green'],marker='o')
-    plt.ylabel('avg. KNN_scores')
+    plt.ylabel('avg. MMD_scores')
     plt.title('n_cols='+col+' | signed-rank test: p val '+str(np.round(p_value,5)))
-    plt.axhline(y=0.5,color='black',linestyle='dashed')
+    plt.axhline(color='black',linestyle='dashed')
     plt.show()
 
 
@@ -144,7 +171,7 @@ for p_ in [20,50,80,150]:
     D = pd.melt(D,ignore_index=False)
     D.rename(columns={'variable':'sKnockOff'},inplace=True)
     sns.lineplot(x=D.index,y='value',hue='sKnockOff',data=D,palette=['green','red']).set_xticks(range(0,p_,p_//10))
-    plt.ylabel('avg. pairwise corr')
+    plt.ylabel('absolute pairwise corr')
     plt.xlabel('column index ')
     plt.title('n_cols='+str(p_))
     plt.show()
@@ -153,7 +180,7 @@ for p_ in [20,50,80,150]:
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 plot_Time = pd.DataFrame(index=["without_randomization","with_randomization"])
 for p_ in [20,50,80,150]:
-    plot_Time[p_] = TIME_KNN['p_'+str(p_)].median(axis=0)
+    plot_Time[p_] = TIME['p_'+str(p_)].median(axis=0)
 
 D = pd.melt((plot_Time/n_knockoff).T,ignore_index=False)
 D.rename(columns={'variable':'sKnockOff'},inplace=True)
