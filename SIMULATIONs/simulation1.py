@@ -30,7 +30,7 @@ def Dist_Z1Z2(Z1,Z2=None):
     return np.mean(dist)
 
 
-MMD_score = lambda Z1,Z2 : Dist_Z1Z2(Z1) + Dist_Z1Z2(Z2) - 2*Dist_Z1Z2(Z1,Z2)
+MMD_score = lambda P1,P2 : Dist_Z1Z2(P1) + Dist_Z1Z2(P2) - 2*Dist_Z1Z2(P1,P2)
 
 
 
