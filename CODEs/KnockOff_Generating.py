@@ -26,7 +26,7 @@ from sklearn.model_selection import GridSearchCV ,RepeatedStratifiedKFold,Repeat
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
-def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
+def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None,  Kernel_nComp=100) :
         """
     Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
 
@@ -43,13 +43,16 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 
     seed_for_sample, seed_for_KernelTrick, seed_for_CV : int ; default None
         Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
+        
+    Kernel_nComp : int ; default 100
+        Dimensionality of the feature space(approximate RBF kernel feature map) used in regression.
 
 
     Returns
     -------
     tuple in the form (X,X_knockoff)
         1st element is the DataMatrix (after scaling, if any) ;
-        Last element is the corresponding KnockOff copy
+        2nd element is the corresponding KnockOff copy
 
     """
 
@@ -67,7 +70,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
     X_knockoff = pd.DataFrame(index=idx)
 
    ## kernel trick --------------------------------------------
-    rbf_sampler = RBFSampler(gamma='scale',random_state=seed_for_KernelTrick)
+    rbf_sampler = RBFSampler(gamma='scale',random_state=seed_for_KernelTrick,n_components=Kernel_nComp)
 
    ## sequencing over columns ---------------------------------
     np.random.seed(seed_for_sample)
@@ -122,7 +125,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 
 
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None) :
+def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None,  Kernel_nComp=100) :
     """
     This function splits the data in a 3 blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
     
@@ -159,15 +162,15 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed
    ## blockwise knockoff generation ---------------------------
     # Block1:-
     Block1,is_Cat1 = Shuffle(Block1)
-    Block1,Block1_knockoff = sKnockOff(Block1, is_Cat1, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block1,Block1_knockoff = sKnockOff(Block1, is_Cat1, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
     Block1,Block1_knockoff = ShuffleBack(Block1, Block1_knockoff)
     # Block2:-
     Block2,is_Cat2 = Shuffle(Block2)
-    Block2,Block2_knockoff = sKnockOff(Block2, is_Cat2, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block2,Block2_knockoff = sKnockOff(Block2, is_Cat2, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
     Block2,Block2_knockoff = ShuffleBack(Block2, Block2_knockoff)
     # Block3:-
     Block3,is_Cat3 = Shuffle(Block3)
-    Block3,Block3_knockoff = sKnockOff(Block3, is_Cat3, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV)
+    Block3,Block3_knockoff = sKnockOff(Block3, is_Cat3, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
     Block3,Block3_knockoff = ShuffleBack(Block3, Block3_knockoff)
 
    ## combining blocks -----------------------------------------
