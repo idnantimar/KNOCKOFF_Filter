@@ -51,7 +51,7 @@ def genMulti(X, n_copy, method=sKnockOff, scaling=True):
         [(X,X_knockoff.1),(X,X_knockoff.2),...,(X,X_knockoff.n_copy)]
 
     """
-    X = pd.DataFrame(X)
+    X = pd.DataFrame(X).copy()
     n,p = X.shape
     names = X.columns
     is_Cat = Cat_or_Num(X)
