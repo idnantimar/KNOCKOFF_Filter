@@ -124,11 +124,15 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 '''
 
 
+from sklearn.model_selection import KFold
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None,  Kernel_nComp=100) :
+
+def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
     """
-    This function splits the data in a 3 blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
-    
+    This function splits the data in a few blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
+
     WARNING: takes too much time than ogiginal sKnockOff method.
 
     """
@@ -140,12 +144,11 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed
     names = X.columns # making sure the col names are string , not int
     names_knockoff = np.vectorize(lambda name: (name+'_kn.off'))(names)
 
-   ## standardizing continuous columns --------------------------
+   ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
 
-   ## splitting 3 blocks --------------------------------------
-    Block1,Block2 = train_test_split(X,test_size=0.66,random_state=seed_for_randomizing)
-    Block2,Block3 = train_test_split(Block2,test_size=0.5,random_state=seed_for_randomizing)
+   ## splitting blocks ----------------------------------------
+    Blocks = list(KFold(n_Blocks,shuffle=True,random_state=seed_for_randomizing).split(X))
 
    ## random shuffle ------------------------------------------
     np.random.seed(seed_for_randomizing)
@@ -160,22 +163,24 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, seed_for_randomizing=None, seed
         return (actualZ,actualZ_knockoff)
 
    ## blockwise knockoff generation ---------------------------
-    # Block1:-
-    Block1,is_Cat1 = Shuffle(Block1)
-    Block1,Block1_knockoff = sKnockOff(Block1, is_Cat1, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
-    Block1,Block1_knockoff = ShuffleBack(Block1, Block1_knockoff)
-    # Block2:-
-    Block2,is_Cat2 = Shuffle(Block2)
-    Block2,Block2_knockoff = sKnockOff(Block2, is_Cat2, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
-    Block2,Block2_knockoff = ShuffleBack(Block2, Block2_knockoff)
-    # Block3:-
-    Block3,is_Cat3 = Shuffle(Block3)
-    Block3,Block3_knockoff = sKnockOff(Block3, is_Cat3, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
-    Block3,Block3_knockoff = ShuffleBack(Block3, Block3_knockoff)
+    ORIGINALs = []
+    KNOCKOFFs = []
+    def blockwise_KnockOff(i):
+        ix = Blocks[i][1]
+        Block = X.iloc[ix]
+        Block,is_Cat_i = Shuffle(Block)
+        Block,Block_knockoff = sKnockOff(Block, is_Cat_i, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
+        return ShuffleBack(Block,Block_knockoff)
+
+    if compute_parallel : OUT = (Parallel(n_jobs=cpu_count())(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
+    else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
+    for Block,Block_knockoff in OUT : 
+        ORIGINALs += [Block]
+        KNOCKOFFs += [Block_knockoff]
 
    ## combining blocks -----------------------------------------
-    X = pd.DataFrame(pd.concat([Block1,Block2,Block3],axis=0),index=idx)
-    X_knockoff = pd.DataFrame(pd.concat([Block1_knockoff,Block2_knockoff,Block3_knockoff],axis=0),index=idx)
+    X = pd.DataFrame(pd.concat(ORIGINALs,axis=0),index=idx)
+    X_knockoff = pd.DataFrame(pd.concat(KNOCKOFFs,axis=0),index=idx)
         # we want to recover both row order and column order
 
    ## KnockOff copy --------------------------------------------
