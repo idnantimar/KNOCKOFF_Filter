@@ -228,8 +228,8 @@ def Visual(X,X_knockoff,is_Cat,appendTitle='',Means=False,KDE=False,scale_the_co
     #> variance ....................................
     XcombinedN.insert(loc=int(k),column='-',value=np.zeros((n,)))
     plt.figure(figsize=(scale_the_corrplot*k,scale_the_corrplot*k))
-    sns.heatmap(XcombinedN.corr(),cmap="YlGnBu", annot=False,square=True)
-    plt.title('combined Correlation Heatmap'+appendTitle)
+    sns.heatmap(XcombinedN.cov(),cmap="YlGnBu", annot=False,square=True)
+    plt.title('combined Covariance Heatmap'+appendTitle)
     plt.show()
 
    ## for Categorical Variables ----------------------------
