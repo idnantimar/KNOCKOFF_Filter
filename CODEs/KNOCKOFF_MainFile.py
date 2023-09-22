@@ -16,7 +16,6 @@ from Derandomized_Decision import *    # Final step of KnockOff
 from Diagnostics import *
 
 
-
 #### for parallel computation .....................................
 from joblib import Parallel, delayed
 from multiprocessing import cpu_count
@@ -25,7 +24,7 @@ from multiprocessing import cpu_count
 
 #### Generating Multiple KnockOff copies at a time ============================
 
-def genMulti(X, n_copy, method=sKnockOff, scaling=True):
+def genMulti(X, n_copy, method=sKnockOff, scaling=True, n_parallel=cpu_count()):
     """
     Generates multiple KnockOff copies of a same DataMatrix.
 
@@ -46,6 +45,9 @@ def genMulti(X, n_copy, method=sKnockOff, scaling=True):
     scaling : bool ; default True
         Whether the DataMatrix should be standardized before calculations.
 
+    n_parallel : int ; default cpu_count()
+        Number of cores used for parallel computing.
+
 
     Returns
     -------
@@ -61,7 +63,7 @@ def genMulti(X, n_copy, method=sKnockOff, scaling=True):
     if scaling : Scale_Numeric(X, is_Cat)
 
     def one_copy(i) : return method(X,is_Cat)
-    return list(Parallel(n_jobs=cpu_count())(delayed(one_copy)(i) for i in range(n_copy)))
+    return list(Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy)))
 
 
 
@@ -75,7 +77,7 @@ def genMulti(X, n_copy, method=sKnockOff, scaling=True):
 #
 #### KnockOff Filter ==========================================================
 
-def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, impStat = basicImp_ContinuousResponse, n_aggregate = 30, acceptance_rate = 0.75, plotting = True, plot_Threshold = True, plot_Legend = True, trueBeta_for_FDP = None, appendTitle = ''):
+def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, impStat = basicImp_ContinuousResponse, n_aggregate = 20, acceptance_rate = 0.6, plotting = True, plot_Threshold = True, plot_Legend = True, trueBeta_for_FDP = None, appendTitle = '', n_parallel=cpu_count()):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -107,22 +109,21 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
             * take input X, X_knockoff , y , FDR
             * produce output as importance statistics corresponding to features , followed by threshold values
 
-    n_aggregate : int ; default 30 ; not needed if Xs_Xknockoffs=True
+    n_aggregate : int ; default 20 ; not needed if Xs_Xknockoffs=True
         Number of KnockOff copies to be generated from same data for derandomized decision.
 
-    acceptance_rate : float between [0,1] ; default 0.75
+    acceptance_rate : float between [0,1] ; default 0.60
         In derandomization , a feature will be accepted if it is accepted in >n_aggregate*acceptance_rate times individually.
 
-    plotting : bool ; default True
-
-    plot_Threshold : bool ; default True
-
-    plot_Legend : bool ; default True
+    plotting, plot_Threshold, plot_Legend : bool ; default True
 
     trueBeta_for_FDP : array of bool ; default None
-        If we know which features are actually important(True) and which ones are null feature(False) , we can input it to compure empirical FDR
+        If we know which features are actually important(True) and which ones are null feature(False) , we can input it to compute empirical FDR.
 
     appendTitle : string ; default ''
+
+    n_parallel : int ; default cpu_count()
+        Number of cores used for parallel computing.
 
 
     Returns
@@ -149,7 +150,7 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
         def this_is_the_main_job(i) :
             X_,X_knockoff = method(X,is_Cat)
             return impStat(X_,X_knockoff,y,FDR)
-        DATA = pd.DataFrame(Parallel(n_jobs=cpu_count())(delayed(this_is_the_main_job)(i) for i in range(n_aggregate)),index=range(n_aggregate))
+        DATA = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(this_is_the_main_job)(i) for i in range(n_aggregate)),index=range(n_aggregate))
 
     else :
         lenKnockOff = len(X)
@@ -157,7 +158,7 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
         def this_is_the_main_job(i) :
             X_,X_knockoff = X[i]
             return impStat(X_,X_knockoff,y,FDR)
-        DATA = pd.DataFrame(Parallel(n_jobs=cpu_count())(delayed(this_is_the_main_job)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
+        DATA = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(this_is_the_main_job)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
 
    ## Filtering ---------------------------------------------
     returnValue = applyFilter(DATA, FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
@@ -167,79 +168,3 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
 
 
 # *****************************************************************************
-##
-###
-####
-###
-##
-# Visualization ===============================================================
-'''
- ** Gives some visualization of 'how well a generated knockoff copy is'
- ** For very large or very small data, maybe problematic
-
-'''
-
-
-def Visual(X,X_knockoff,is_Cat,appendTitle='',Means=False,KDE=False,scale_the_corrplot=0.25):
-    n,p = X.shape
-    names = X.columns
-    Xcombined = pd.concat([X,X_knockoff],axis=1)
-    isCat_Combined = list(is_Cat)+list(is_Cat)
-    k = p-sum(is_Cat)
-
-   ## for Numerical variables ------------------------------
-    XcombinedN = Xcombined.iloc[:,np.invert(isCat_Combined)].copy()
-    #> means .......................................
-    if Means:
-        means = XcombinedN.apply(lambda x: np.mean(x)).to_numpy()
-        pd.DataFrame({'original': means[:k],
-                      'knockoff': means[k:]},index=names[np.invert(is_Cat)]).plot(kind='barh',title='Means'+appendTitle,rot=45,figsize=(8,0.2*k))
-        plt.show()
-    # KDE ..........................................
-    if KDE:
-        fig, axes = plt.subplots(2,1,figsize=(7,12))
-        plt.subplots_adjust(hspace=0.2)
-        XcombinedN.iloc[:,:k].plot(kind='density',title='Original'+appendTitle,ax=axes[0],grid=True)
-        XcombinedN.iloc[:,k:].plot(kind='density',title='Knockoff'+appendTitle,ax=axes[1],grid=True)
-        plt.show()
-    #> variance ....................................
-    XcombinedN.insert(loc=int(k),column='-',value=np.zeros((n,)))
-    plt.figure(figsize=(scale_the_corrplot*k,scale_the_corrplot*k))
-    sns.heatmap(XcombinedN.cov(),cmap="YlGnBu", annot=False,square=True)
-    plt.title('combined Covariance Heatmap'+appendTitle)
-    plt.show()
-
-   ## for Categorical Variables ----------------------------
-    XcombinedC = Xcombined.iloc[:,isCat_Combined]
-    k = p-k
-    if k>2:
-        r,c = int(np.ceil(k/2)),2
-        fig, axes = plt.subplots(r,c,figsize=(3*c,3*r))
-        fig.suptitle('Counts'+appendTitle)
-        plt.subplots_adjust(hspace=0.5)
-        for i in range(k):
-            r, c = i//2 , i%2
-            pd.DataFrame({'original': (XcombinedC.iloc[:,i].groupby(XcombinedC.iloc[:,i])).count(),
-                          'knockoff': (XcombinedC.iloc[:,i+k].groupby(XcombinedC.iloc[:,i+k])).count()}).plot(kind='bar',ax=axes[r,c],title=str(XcombinedC.iloc[:,i].name),rot=30,legend=np.invert(bool(i)))
-        plt.show()
-    elif k==2:
-        fig, axes = plt.subplots(1,2,figsize=(3*2,3))
-        fig.suptitle('Counts'+appendTitle)
-        plt.subplots_adjust(hspace=0.5)
-        for i in range(k):
-            pd.DataFrame({'original': (XcombinedC.iloc[:,i].groupby(XcombinedC.iloc[:,i])).count(),
-                          'knockoff': (XcombinedC.iloc[:,i+k].groupby(XcombinedC.iloc[:,i+k])).count()}).plot(kind='bar',ax=axes[i],title=str(XcombinedC.iloc[:,i].name),rot=30,legend=np.invert(bool(i)))
-        plt.show()
-    elif k==1:
-        fig, axes = plt.subplots(1,1,figsize=(3,3.5))
-        plt.subplots_adjust(hspace=0.5)
-        fig.suptitle('Counts'+appendTitle)
-        pd.DataFrame({'original': (XcombinedC.iloc[:,0].groupby(XcombinedC.iloc[:,0])).count(),
-                      'knockoff': (XcombinedC.iloc[:,1].groupby(XcombinedC.iloc[:,1])).count()}).plot(kind='bar',ax=axes,title=str(XcombinedC.iloc[:,0].name),rot=30,legend=True)
-        plt.show()
-
-
-
-
-# *****************************************************************************
-
