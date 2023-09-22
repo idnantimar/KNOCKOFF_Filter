@@ -11,10 +11,8 @@ Topic: Basic Codes that are needed again and again in many calculations
 import pandas as pd
 import numpy as np
 from collections import Counter
-from numpy.random import choice,normal,multinomial,multivariate_normal
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import ElasticNetCV, LogisticRegression
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -25,12 +23,13 @@ import seaborn as sns
 #### Data Type ================================================================
 def Cat_or_Num(X):
     """ Determines whether a data column is Categorical or Numerical in a DataFrame
-        Assuming the 1st entry of a column is not missing
+        ( Assuming the 1st entry of a column is not missing )
         Output is an array of size=number_of_columns ; True = Categorical , False = Numerical
     """
     n_col=X.shape[1]
     numericType = np.vectorize(lambda pos: isinstance(X.iloc[0,pos], (np.integer,np.floating)))
     return np.invert(numericType(range(n_col)))
+
 
 
 # *****************************************************************************
@@ -49,6 +48,7 @@ def Scale_Numeric(X,is_Cat):
     X.iloc[:,np.invert(is_Cat)] = StandardScaler().fit_transform(x)
 
 
+
 # *****************************************************************************
 ##
 ###
@@ -58,7 +58,7 @@ def Scale_Numeric(X,is_Cat):
 #
 #### Simulate Samples =========================================================
 
-def simulateIndependent(n_obs,col_type,NUM=lambda size: normal(0,1,size),CAT=lambda size: choice(['A','B','C','D'],size,replace=True)):
+def simulateIndependent(n_obs,col_type,NUM=lambda size: np.random.normal(0,1,size),CAT=lambda size: np.random.choice(['A','B','C','D'],size,replace=True)):
     """
     A function to simulate a DataMatrix , where each column is sampled from some population , independent of each other.
 
@@ -69,9 +69,9 @@ def simulateIndependent(n_obs,col_type,NUM=lambda size: normal(0,1,size),CAT=lam
     col_type : tuple as (N,C) or array as [True,False,True,True,True,...]
         * If tuple, 1st element N denotes number of Numerical columns , 2nd element C denotes number of Categorical columns. When only one kind of columns are needed, input the other element as 0
         * If array as [True,False,...] , True denotes which position is for Numerical column, False denotes which position is for Categorical column.
-    NUM : a function ;  default is lambda size: normal(0,1,size)
+    NUM : a function ;  default is lambda size: np.random.normal(0,1,size)
         Mentions from where to sample Numerical columns.
-    CAT : a function ; default is lambda size: choice(['A','B','C','D'],size,replace=True))
+    CAT : a function ; default is lambda size: np.random.choice(['A','B','C','D'],size,replace=True))
         Mentions from where to sample Categorical columns.
 
     Returns
@@ -88,7 +88,7 @@ def simulateIndependent(n_obs,col_type,NUM=lambda size: normal(0,1,size),CAT=lam
     NUM_Block = [pd.Series(NUM(n_obs)) for _ in range(N)]
     CAT_Block = [pd.Series(CAT(n_obs)) for _ in range(C)]
     BLOCKs = pd.concat(NUM_Block+CAT_Block,axis=1)
-    BLOCKs.rename(columns={**{i:('Num'+str(i)) for i in range(N)},**{(N+j):('Cat'+str(j)) for j in range(C)}},inplace=True)
+    BLOCKs.columns = [('Num'+str(i)) for i in range(N)] + [('Cat'+str(j)) for j in range(C)]
     col_order = []
     i,j,k = 0,0,0
     tot = N+C
@@ -107,7 +107,7 @@ def simulateIndependent(n_obs,col_type,NUM=lambda size: normal(0,1,size),CAT=lam
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def simulateJoint(n_obs,popln=lambda size: multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)):
+def simulateJoint(n_obs,popln=lambda size: np.random.multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)):
     """
     A function to simulate a DataMatrix from a joint-distribution specified.
 
@@ -115,7 +115,7 @@ def simulateJoint(n_obs,popln=lambda size: multivariate_normal(np.random.rand(10
     ----------
     n_obs : int
         Number of observations per column.
-    popln : a function mentioning the joint distribution of the columns ; default is lambda size: multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)
+    popln : a function mentioning the joint distribution of the columns ; default is lambda size: np.random.multivariate_normal(np.random.rand(10), np.corrcoef(np.random.rand(10,100)),size)
 
     Returns
     -------
@@ -124,10 +124,73 @@ def simulateJoint(n_obs,popln=lambda size: multivariate_normal(np.random.rand(10
     """
 
     OUT = pd.DataFrame(popln(n_obs))
-    cols = OUT.columns
-    OUT.rename(columns={i:'col_'+str(i) for i in cols},inplace=True)
+    OUT.columns = ['col_'+str(i) for i in OUT.columns]
 
     return OUT
+
+
+
+# *****************************************************************************
+##
+###
+####
+###
+##
+#### Visualization ============================================================
+'''
+ ** Gives some visualization of 'how well a generated knockoff copy is'
+ ** For very large or very small data, maybe problematic
+
+'''
+
+
+def Visual(X,X_knockoff,is_Cat,appendTitle='',Means=False,KDE=False,scale_the_corrplot=0.25):
+    """ Gives some visualization of the combined data [X,X_knockoff]
+    """
+    n,p = X.shape
+    names = X.columns
+    Xcombined = pd.concat([X,X_knockoff],axis=1)
+    isCat_Combined = list(is_Cat)+list(is_Cat)
+    k = p-sum(is_Cat)
+
+   ## for Numerical variables ------------------------------
+    if k:
+        XcombinedN = Xcombined.iloc[:,np.invert(isCat_Combined)].copy()
+        #> means .......................................
+        if Means:
+            means = XcombinedN.apply(lambda x: np.mean(x)).to_numpy()
+            pd.DataFrame({'original': means[:k],
+                          'knockoff': means[k:]},index=names[np.invert(is_Cat)]).plot(kind='barh',title='Means'+appendTitle,rot=45,figsize=(8,0.2*k))
+            plt.show()
+        # KDE ..........................................
+        if KDE:
+            fig, axes = plt.subplots(2,1,figsize=(7,12))
+            plt.subplots_adjust(hspace=0.2)
+            XcombinedN.iloc[:,:k].plot(kind='density',title='Original'+appendTitle,ax=axes[0],grid=True)
+            XcombinedN.iloc[:,k:].plot(kind='density',title='Knockoff'+appendTitle,ax=axes[1],grid=True)
+            plt.show()
+        #> variance ....................................
+        XcombinedN.insert(loc=int(k),column='-',value=np.zeros((n,)))
+        plt.figure(figsize=(scale_the_corrplot*k,scale_the_corrplot*k))
+        sns.heatmap(XcombinedN.cov(),cmap="YlGnBu", annot=False,square=True)
+        plt.title('combined Covariance Heatmap'+appendTitle)
+        plt.show()
+
+   ## for Categorical Variables ----------------------------
+    XcombinedC = Xcombined.iloc[:,isCat_Combined]
+    namesC = XcombinedC.columns
+    k = p-k
+    if k:
+        r,c = int(np.ceil(k/2)) , (2 if k!=1 else 1)
+        fig, axes = plt.subplots(r,c, figsize= (3*c,3*r) if k!=1 else (3,3.5))
+        fig.suptitle('Counts'+appendTitle)
+        plt.subplots_adjust(hspace=0.5)
+        for i in range(k):
+            current_plot = axes[i//2 , i%2] if k>2 else (axes[i] if k==2 else axes)
+            pd.DataFrame({'original': Counter(XcombinedC.iloc[:,i]),
+                          'knockoff': Counter(XcombinedC.iloc[:,i+k])}).plot(kind='bar',ax=current_plot, title=str(namesC[i]),rot=30,legend=np.invert(bool(i)))
+        plt.show()
+
 
 
 
