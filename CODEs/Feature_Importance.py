@@ -8,22 +8,12 @@ Topic: Computing relative importance of the features and threshold for selection
 from Basics import *
 
 
-#### Feature Importance Statistics ============================================
-'''
- ** Computes a statistic with the importance of feature Xj & its KnockOff counterpart on regressing y based on combined data .
-Constructed in a manner that it can take both +ve & -ve value , and large +ve value indicates that the feature is important.
-    example: regress y on [X,X_knockoff] , let Bj & Bj_ko be estimated coeff. corresponding to Xj & Xj_knockoff respectively.
-                    Wj = |Bj|-|Bj_ko| ;j=1,...,p
-            is an example of such statistic
 
- NOTE: To construct KnockOff copy we do not need response y. But to construct Importance Statistic we need y . Since, without looking at y, X & X_knockoff are indistinguishable by definition.
-
-'''
-
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def THRESHOLD(W,FDR=0.1) :
     ## based on available feature importance W , determine the threshold for selection/rejection of feature
-    T = (np.abs(W)).sort_values()
+    T = (np.abs(W)).sort_values(ascending=True)
     def isFDPlessFDR(t):
         return (((1+np.sum(W<=-t))/max(1,np.sum(W>=t))) <=FDR)
     Threshold = np.inf
@@ -35,6 +25,7 @@ def THRESHOLD(W,FDR=0.1) :
                 Threshold = t
                 break
     return Threshold
+
 
 
 def appendTHRESHOLDs(W,FDR):
@@ -58,36 +49,44 @@ def appendTHRESHOLDs(W,FDR):
     vTHRESHOLD = np.vectorize(lambda f : THRESHOLD(W,f))
     vId = np.vectorize(lambda f : 'THRESHOLD_'+str(f*100))
     Threshold = vTHRESHOLD(FDR)
-    vId = vId(FDR).reshape((-1,))
+    vId = vId(FDR).ravel()
 
     return pd.concat([W,pd.Series(Threshold,index=vId)])
 
 
-
-
-##### =========================================================================
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def absDiff(Z1,Z2):
-    """
-    array ; |Z1|-|Z2|
-
+    """ array ; |Z1|-|Z2|
     """
     return np.abs(Z1)-np.abs(Z2)
 
 
 
 def signedMax(Z1,Z2):
-    """
-    array ; max(Z1,Z2).sign(Z1-Z2)
-
+    """array ; max(Z1,Z2).sign(Z1-Z2)
     """
     return np.vstack((Z1,Z2)).max(axis=0)*np.sign(Z1-Z2)
 
 
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-#### ==========================================================================
 
+#### Feature Importance Statistics ============================================
+'''
+ ** Computes a statistic with the importance of feature Xj & its KnockOff counterpart on regressing y based on combined data .
+Constructed in a manner that it can take both +ve & -ve value , and large +ve value indicates that the feature is important.
+    example: regress y on [X,X_knockoff] , let Bj & Bj_ko be estimated coeff. corresponding to Xj & Xj_knockoff respectively.
+                    Wj = |Bj|-|Bj_ko| ;j=1,...,p
+            is an example of such statistic
+
+ NOTE: To construct KnockOff copy we do not need response y. But to construct Importance Statistic we need y . Since, without looking at y, X & X_knockoff are indistinguishable by definition.
+
+'''
+
+
+from sklearn.linear_model import ElasticNetCV, LogisticRegression
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
@@ -95,16 +94,17 @@ from sklearn.exceptions import ConvergenceWarning
 def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=None):
     """
     Regression Coefficient based importance for continuous response case
+    The columns of [X,X_knockoff] should be on same scale
+
     """
     X = pd.get_dummies(X,drop_first=True)
     n,p = X.shape
     names = X.columns
     X_knockoff = pd.get_dummies(X_knockoff, drop_first=True)
     y = pd.DataFrame(y)
-    y = StandardScaler().fit_transform(y)
+    y = StandardScaler().fit_transform(y).ravel()
         # get_dummies() put all the numeric variables first and dummy variables at the end
          # So to maintain same ordering of original and knockoff variables , we have to first dummify them individually then concat, instead of first concat then dummify the combined data
-    y = np.ravel(y)
 
    ## feature importance ------------------------------------
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -129,6 +129,8 @@ def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=
 def basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax):
     """
     Regression Coefficient based importance for binary response case
+    The columns of [X,X_knockoff] should be on same scale
+
     """
 
     X = pd.get_dummies(X,drop_first=True)
