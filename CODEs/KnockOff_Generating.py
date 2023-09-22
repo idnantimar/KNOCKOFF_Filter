@@ -21,13 +21,15 @@ from Basics import *
 
 '''
 
+from sklearn.linear_model import ElasticNetCV, LogisticRegression
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.model_selection import GridSearchCV ,RepeatedStratifiedKFold,RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
-def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None,  Kernel_nComp=100) :
-        """
+
+def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
+    """
     Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
 
     Parameters
@@ -43,10 +45,9 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 
     seed_for_sample, seed_for_KernelTrick, seed_for_CV : int ; default None
         Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
-        
+
     Kernel_nComp : int ; default 100
         Dimensionality of the feature space(approximate RBF kernel feature map) used in regression.
-
 
     Returns
     -------
@@ -58,9 +59,8 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 
     X = pd.DataFrame(X).copy()
     n,p = X.shape
-    names = X.columns
     idx = X.index
-    X.rename(columns={name:str(name) for name in names},inplace=True)
+    X.columns = X.columns.astype(str)
     names = X.columns # making sure the col names are string , not int
 
    ## standardizing continuous columns ------------------------
@@ -80,12 +80,12 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
         Xj = X[name] # response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
         Xcombined_j = pd.concat([X.drop(name,axis=1),X_knockoff],axis=1) # predictors
         current_isCat = Cat_or_Num(Xcombined_j)
-        Xcombined_jKernel = rbf_sampler.fit_transform(Xcombined_j.iloc[:,np.invert(current_isCat)]) # kernel trick on numerical columns
+        Xcombined_jKernel = rbf_sampler.fit_transform(Xcombined_j.iloc[:,np.invert(current_isCat)]) if (not current_isCat.all()) else Xcombined_j.iloc[:,np.invert(current_isCat)]
+        # kernel trick on numerical columns
         Xcombined_jCat = Xcombined_j.iloc[:,current_isCat] # categorical columns
 
         Xcombined_j = pd.get_dummies(pd.concat([pd.DataFrame(Xcombined_jKernel,index=idx),Xcombined_jCat],axis=1),drop_first=True)
-        Xcombined_j.rename(columns={nam:str(nam) for nam in Xcombined_j.columns},inplace=True)
-
+        Xcombined_j.columns = Xcombined_j.columns.astype(str)
 
         if is_Cat[j] :
             #> fit ........................................
@@ -95,7 +95,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
              categories = Model.classes_
              probabilities = pd.DataFrame(Model.predict_proba(Xcombined_j),index=idx)
             #> new sample .................................
-             Xj_copy = probabilities.apply(lambda x : list(multinomial(1,x)).index(1),axis=1)
+             Xj_copy = probabilities.apply(lambda x : np.random.multinomial(1,x), axis=1,result_type='expand').idxmax(axis=1)
              Xj_copy = categories[Xj_copy]
 
         else :
@@ -105,10 +105,10 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
              Xj_copy = Model.predict(Xcombined_j)
              s = np.std(Xj-Xj_copy)
             #> new sample ..................................
-             Xj_copy = normal(Xj_copy,s)
+             Xj_copy = np.random.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
-        
+
     warnings.filterwarnings("default", category=ConvergenceWarning)
 
    ## KnockOff copy --------------------------------------------
@@ -122,7 +122,6 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
  ** To address this problem , split the data in a few blocks , shuffle the order of columns in each block , generate Sequential Knockoff as usual , then reshuffle them back to original order. Finally stack them together as the beginning
 
 '''
-
 
 from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
@@ -138,10 +137,9 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=Fa
     """
     X = pd.DataFrame(X).copy()
     n,p = X.shape
-    names = X.columns
     idx = X.index
-    X.rename(columns={name:str(name) for name in names},inplace=True)
-    names = X.columns # making sure the col names are string , not int
+    X.columns = X.columns.astype(str)
+    names = X.columns
     names_knockoff = np.vectorize(lambda name: (name+'_kn.off'))(names)
 
    ## standardizing continuous columns ------------------------
@@ -153,7 +151,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=Fa
    ## random shuffle ------------------------------------------
     np.random.seed(seed_for_randomizing)
     def Shuffle(Z):
-        S = choice(range(p),size=p,replace=False)
+        S = np.random.choice(range(p),size=p,replace=False)
         shuffled_Data = Z.iloc[:,S]
         is_Cat_similarly = list(pd.Series(is_Cat)[S])
         return (shuffled_Data, is_Cat_similarly)
@@ -170,11 +168,12 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=Fa
         Block = X.iloc[ix]
         Block,is_Cat_i = Shuffle(Block)
         Block,Block_knockoff = sKnockOff(Block, is_Cat_i, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
-        return ShuffleBack(Block,Block_knockoff)
+        return ShuffleBack(Block, Block_knockoff)
+
 
     if compute_parallel : OUT = (Parallel(n_jobs=cpu_count())(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
     else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
-    for Block,Block_knockoff in OUT : 
+    for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
         KNOCKOFFs += [Block_knockoff]
 
