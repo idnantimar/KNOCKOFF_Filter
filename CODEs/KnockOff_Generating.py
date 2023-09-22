@@ -125,14 +125,13 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
 
 from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
-from multiprocessing import cpu_count
 
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=False, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
+def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
     """
     This function splits the data in a few blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
 
-    WARNING: takes too much time than ogiginal sKnockOff method.
+    WARNING: takes too much time than ogiginal sKnockOff method, but easily parallelizable.
 
     """
     X = pd.DataFrame(X).copy()
@@ -171,7 +170,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, compute_parallel=Fa
         return ShuffleBack(Block, Block_knockoff)
 
 
-    if compute_parallel : OUT = (Parallel(n_jobs=cpu_count())(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
+    if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel)(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
     else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
     for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
