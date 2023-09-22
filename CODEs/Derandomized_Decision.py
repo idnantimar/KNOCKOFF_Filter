@@ -18,7 +18,7 @@ def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True
         * last columns are cut-off values corresponding to FDR ,
     this function creates derandomized decision based on available iterations
     """
-    FDRs = np.array(FDR).reshape((-1,))
+    FDRs = np.array(FDR).ravel()
     lenFDR = len(FDRs)
     CutOffs = DATA.iloc[:,-lenFDR:]
     Scores = DATA.iloc[:,:-lenFDR]
