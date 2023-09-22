@@ -10,7 +10,7 @@ from Basics import *
 
 #### Filtering ================================================================
 
-def applyFilter(DATA,FDR,acceptance_rate=0.75,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle=''):
+def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle=''):
     """
     When we have a DataFrame , where -
         * each row is one iteration ,
@@ -38,7 +38,7 @@ def applyFilter(DATA,FDR,acceptance_rate=0.75,trueBeta_for_FDP=None,plotting=Tru
 
        ## FDP ----------------------------------------------
         FDP = "True coefficients are Not known"
-        if trueBeta_for_FDP is not None:
+        if trueBeta_for_FDP != None:
             trueBeta_for_FDP = np.array(np.array(trueBeta_for_FDP,dtype=bool),dtype=int)
             countFD = lambda x: np.sum((x-trueBeta_for_FDP)==1)
                 # counts where selected = True but true coefficient = 0
@@ -67,3 +67,7 @@ def applyFilter(DATA,FDR,acceptance_rate=0.75,trueBeta_for_FDP=None,plotting=Tru
 
    ## return value -----------------------------------------
     return OUTPUT
+
+
+
+# *****************************************************************************
