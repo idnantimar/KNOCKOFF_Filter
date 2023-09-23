@@ -13,32 +13,30 @@ from Basics import *
  ** NOTE: For Numerical data only
 '''
 
-
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics.pairwise import pairwise_kernels
 import random
 
 
-def Dist_Z1Z2(Z1,Z2=None):
-    #  estimates E|Z1-Z2| , where Z1 & Z2 are two independent random variables
+def kernel_Z1Z2(Z1,Z2=None,metric_type='rbf'):
+    #  estimates E[k(Z1,Z2)] = <E[Phi(Z1)],E[Phi(Z2)]>
     # Inputs are two DataMatrix corresponding to Z1 & Z2 observations respectively
-    dist = pairwise_distances(Z1,Z2)
-    np.fill_diagonal(dist ,0)
-    return np.mean(dist)
+    D= pairwise_kernels(Z1,Z2,metric_type)
+    np.fill_diagonal(D,0)
+    return np.mean(D)
 
 
-MMD_score = lambda P1,P2 : Dist_Z1Z2(P1) + Dist_Z1Z2(P2) - 2*Dist_Z1Z2(P1,P2)
+MMD_score = lambda P1,P2,kernel_type : kernel_Z1Z2(P1,metric_type=kernel_type) + kernel_Z1Z2(P2,metric_type=kernel_type) - 2*kernel_Z1Z2(P1,P2,metric_type=kernel_type)
 
 
 
-
-def MMD_checkQuality(X,X_knockoff, n_partialSwap = 20, set_seed=None):
+def MMD_checkQuality(X,X_knockoff,n_partialSwap=20,set_seed=None,kernel_type='rbf'):
     """
     let LHS = [X,X_knockoff]
         RHS = anySwap(LHS)
-        Dist_Z1Z2 = estimated_E|Z1-Z2| , where Z1 & Z2 are two independent random variables
+        kernel_Z1Z2 = estimated_<E[Phi(Z1)],E[Phi(Z2)]> , where Z1 & Z2 are two independent random variables
 
     If the knockoff copy is of good quality, LHS & RHS should be identically distributed.
-        MMD_score = Dist_Z1Z2(LHS,LHS) + Dist_Z1Z2(RHS,RHS) - 2*Dist_Z1Z2(LHS,RHS)  , should be near 0 in such case. The further this score from 0 , it says the knockoff fails to mimic the original data.
+        MMD_score = kernel_Z1Z2(LHS,LHS) + kernel_Z1Z2(RHS,RHS) - 2*kernel_Z1Z2(LHS,RHS)  , should be near 0 in such case. The further this score from 0 , it says the knockoff fails to mimic the original data.
     """
     n,p = X.shape
     LHS = pd.concat([X,X_knockoff],axis=1)
@@ -50,11 +48,11 @@ def MMD_checkQuality(X,X_knockoff, n_partialSwap = 20, set_seed=None):
         col_ix[(swappable+p)] -= p
         return LHS.iloc[:,col_ix]
 
-    score = [MMD_score(LHS,fullSwap())]
+    score = [MMD_score(LHS,fullSwap(),kernel_type)]
     random.seed(set_seed)
     np.random.seed(set_seed)
     for _ in range(n_partialSwap):
-        score += [MMD_score(LHS,partialSwap())]
+        score += [MMD_score(LHS,partialSwap(),kernel_type)]
 
     return np.mean(score)
 
