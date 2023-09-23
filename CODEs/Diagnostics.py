@@ -2,8 +2,6 @@
 Created on Tue Sep 19 23:16:49 2023
 
 Topic: Checking the quality of knockoff
-NOTE: For Numerical data only
-
 @author: R.Nandi
 """
 
@@ -11,6 +9,10 @@ from Basics import *
 
 
 #### Diagnostic of the quality of knockoff ====================================
+'''
+ ** NOTE: For Numerical data only
+'''
+
 
 from sklearn.metrics import pairwise_distances
 import random
@@ -29,7 +31,7 @@ MMD_score = lambda P1,P2 : Dist_Z1Z2(P1) + Dist_Z1Z2(P2) - 2*Dist_Z1Z2(P1,P2)
 
 
 
-def MMD_checkQuality(X,X_knockoff, n_partialSwap = 10):
+def MMD_checkQuality(X,X_knockoff, n_partialSwap = 20, set_seed=None):
     """
     let LHS = [X,X_knockoff]
         RHS = anySwap(LHS)
@@ -43,12 +45,14 @@ def MMD_checkQuality(X,X_knockoff, n_partialSwap = 10):
     fullSwap = lambda : pd.concat([X_knockoff,X],axis=1)
     def partialSwap():
         col_ix = np.array(range(2*p))
-        swappable = choice(range(p),size=random.randint(1,p),replace=False)
+        swappable = np.random.choice(range(p),size=random.randint(1,p),replace=False)
         col_ix[swappable] += p
         col_ix[(swappable+p)] -= p
         return LHS.iloc[:,col_ix]
 
     score = [MMD_score(LHS,fullSwap())]
+    random.seed(set_seed)
+    np.random.seed(set_seed)
     for _ in range(n_partialSwap):
         score += [MMD_score(LHS,partialSwap())]
 
