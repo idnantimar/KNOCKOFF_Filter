@@ -38,7 +38,7 @@ def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True
 
        ## FDP ----------------------------------------------
         FDP = "True coefficients are Not known"
-        if trueBeta_for_FDP != None:
+        if trueBeta_for_FDP is not None:
             trueBeta_for_FDP = np.array(np.array(trueBeta_for_FDP,dtype=bool),dtype=int)
             countFD = lambda x: np.sum((x-trueBeta_for_FDP)==1)
                 # counts where selected = True but true coefficient = 0
