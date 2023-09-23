@@ -5,8 +5,7 @@ Topic: Simulates random DataMatrix and Gives some visualization
 @author: R.Nandi
 """
 
-
-
+from Basics import *
 
 
 #### Simulate Samples =========================================================
