@@ -14,6 +14,7 @@ from KnockOff_Generating import *      # First step of KnockOff
 from Feature_Importance import *     # Intermediate step of KnockOff
 from Derandomized_Decision import *    # Final step of KnockOff
 from Diagnostics import *
+from Simulation_and_Visualization import *
 
 
 #### for parallel computation .....................................
@@ -113,7 +114,7 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
         Number of KnockOff copies to be generated from same data for derandomized decision.
 
     acceptance_rate : float between [0,1] ; default 0.60
-        In derandomization , a feature will be accepted if it is accepted in >n_aggregate*acceptance_rate times individually.
+        In derandomization , a feature will be accepted if it is accepted in >=n_aggregate*acceptance_rate times individually.
 
     plotting, plot_Threshold, plot_Legend : bool ; default True
 
@@ -152,13 +153,8 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
             return impStat(X_,X_knockoff,y,FDR)
         DATA = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(this_is_the_main_job)(i) for i in range(n_aggregate)),index=range(n_aggregate))
 
-    else :
-        lenKnockOff = len(X)
+    else : DATA = scoreMulti(X,y,FDR,impStat,n_parallel)
 
-        def this_is_the_main_job(i) :
-            X_,X_knockoff = X[i]
-            return impStat(X_,X_knockoff,y,FDR)
-        DATA = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(this_is_the_main_job)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
 
    ## Filtering ---------------------------------------------
     returnValue = applyFilter(DATA, FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
