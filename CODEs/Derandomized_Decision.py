@@ -12,11 +12,13 @@ from Basics import *
 
 def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle=''):
     """
-    When we have a DataFrame , where -
+    When we have multiple KnockOff copies corresponding to same DataMatrix, based on each of them we can compute one possible feature importance. Goal is to make one overall decision based on them.
+
+    If we have a DataFrame of size (number_of_knockoff_copy, number_of_features+number_of_FDR_input) , where -
         * each row is one iteration ,
         * initial columns are feature importance scores corresponding to various features,
         * last columns are cut-off values corresponding to FDR ,
-    this function creates derandomized decision based on available iterations
+    this function creates derandomized decision based on available iterations regarding "which feature should be accepted/rejected for FDR control" .
     """
     FDRs = np.array(FDR).ravel()
     lenFDR = len(FDRs)
@@ -30,19 +32,19 @@ def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True
         FDR = FDRs[t]
 
        ## selecting features -------------------------------
-        selectFeature = W.apply(lambda x: x[:-1]>=x[-1],axis=1 )
-            # corresponding to each iteration, gives 1 for selected feature , 0 for not selected
-        SelectFeature = selectFeature.apply(np.mean,axis=0)
+        SelectFeature = W.apply(lambda x: x[:-1]>=x[-1], axis=1).apply(np.mean,axis=0)
+            # in first step, corresponding to each iteration- gives True for selected feature , False for rejected
+            # in next step , computes the proportion of times each feature was selected out of total iterations
         SelectFeature = (SelectFeature>=acceptance_rate)
         Selected = names[SelectFeature]
 
        ## FDP ----------------------------------------------
         FDP = "True coefficients are Not known"
         if trueBeta_for_FDP is not None:
-            trueBeta_for_FDP = np.array(np.array(trueBeta_for_FDP,dtype=bool),dtype=int)
+            trueBeta_for_FDP = np.array(trueBeta_for_FDP,dtype=bool).astype(int)
             countFD = lambda x: np.sum((x-trueBeta_for_FDP)==1)
                 # counts where selected = True but true coefficient = 0
-            FDP = countFD(np.array(SelectFeature,dtype=int))
+            FDP = countFD(SelectFeature)
             FDP /= max(1,sum(SelectFeature))
 
        ## Plotting -----------------------------------------
