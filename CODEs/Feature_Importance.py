@@ -159,6 +159,7 @@ def basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax):
 #### ==========================================================================
 
 from sklearn.metrics import log_loss
+from sklearn.model_selection import train_test_split
 
 
 def LOFO_ImpCategorical(X,X_knockoff,y,FDR=0.1,seed=None,take_diff=True,Scoring=signedMax):
