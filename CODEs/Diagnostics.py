@@ -45,7 +45,7 @@ def MMD_checkQuality(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=20,set_
     (If we could actually compute the expectations E[Phi(Zi)] , we must get MMD_score>=0 . But due to sample estimates , this score can be -ve sometimes.)
 
     NOTE: To make the observations in LHS & RHS independent , we need -
-                * X1st & X2nd two independent DataMatrix , though the observations are identically distributed
+                * X1st & X2nd two independent DataMatrix , though the observations are identically distributed, i.e. X1st & X2nd two disjoint partition of the entire DataMatrix X
                 * X1st_knockoff is not based on X2nd , similarly X2nd_knockoff is not based on X1st
 
     """
