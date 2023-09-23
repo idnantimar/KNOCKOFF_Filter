@@ -11,7 +11,6 @@ Topic: Basic Codes that are needed again and again in many calculations
 import pandas as pd
 import numpy as np
 from collections import Counter
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 import matplotlib.pyplot as plt
