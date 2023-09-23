@@ -37,6 +37,9 @@ def MMD_checkQuality(X,X_knockoff,n_partialSwap=20,set_seed=None,kernel_type='rb
 
     If the knockoff copy is of good quality, LHS & RHS should be identically distributed.
         MMD_score = kernel_Z1Z2(LHS,LHS) + kernel_Z1Z2(RHS,RHS) - 2*kernel_Z1Z2(LHS,RHS)  , should be near 0 in such case. The further this score from 0 , it says the knockoff fails to mimic the original data.
+
+    NOTE: i-th row of LHS and j-th row of RHS should be independent, unless i=j
+
     """
     n,p = X.shape
     LHS = pd.concat([X,X_knockoff],axis=1)
