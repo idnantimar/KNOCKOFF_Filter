@@ -162,7 +162,7 @@ from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 
 
-def LOFO_ImpCategorical(X,X_knockoff,y,FDR=0.1,seed=None,take_diff=True,Scoring=signedMax):
+def LOFO_ImpCategorical(X, X_knockoff, y, FDR=0.1, seed=None, take_diff=True, Scoring=signedMax):
     """
     For each column in combined data,
     fit the model y~[X,X_knockoff] once in the presence of that column & once in absence.
@@ -240,3 +240,7 @@ def LOFO_ImpCategorical(X,X_knockoff,y,FDR=0.1,seed=None,take_diff=True,Scoring=
 
    ## selecting Threshold -----------------------------------
     return appendTHRESHOLDs(W,FDR)
+
+
+
+# *****************************************************************************
