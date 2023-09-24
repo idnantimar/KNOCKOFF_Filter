@@ -21,8 +21,6 @@ NOTE: Appending the "path/to/this/folder" to the sys.path() & Importing this 'Kn
 from .Basics import *
 from . import Compute_Multiple
 from . import Derandomized_Decision
-from . import Diagnostics
-from . import Simulation_and_Visualization
 
 
 
