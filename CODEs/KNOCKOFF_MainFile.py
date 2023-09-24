@@ -10,75 +10,20 @@ NOTE: Appending the "path/to/this/folder" to the sys.path() & Importing this 'KN
 
 #### importing codes from modules created earlier .................
 from Basics import *
-from KnockOff_Generating import *      # First step of KnockOff
-from Feature_Importance import *     # Intermediate step of KnockOff
-from Derandomized_Decision import *    # Final step of KnockOff
-from Diagnostics import *
-from Simulation_and_Visualization import *
-
-
-#### for parallel computation .....................................
-from joblib import Parallel, delayed
-from multiprocessing import cpu_count
+import KnockOff_Generating     # First step of KnockOff
+import Feature_Importance      # Intermediate step of KnockOff
+import Derandomized_Decision   # Final step of KnockOff
+import Compute_Multiple
+import Diagnostics
+import Simulation_and_Visualization
 
 
 
-#### Generating Multiple KnockOff copies at a time ============================
-
-def genMulti(X, n_copy, method=sKnockOff, scaling=True, n_parallel=cpu_count()):
-    """
-    Generates multiple KnockOff copies of a same DataMatrix.
-
-    Parameters
-    ----------
-    X : DataFrame or 2d-array
-        The DataMatrix.
-
-    n_copy : int
-        Number of copies to be generated.
-
-    method : A function that creates X_knockoff ; default sKnockOff
-        This function should take input -
-            * X : DataMatrix
-            * is_Cat : an array indicating which column is Categorical(True) , which one is Numerical(False)
-        & produce output (X,X_knockoff) tuple.
-
-    scaling : bool ; default True
-        Whether the DataMatrix should be standardized before calculations.
-
-    n_parallel : int ; default cpu_count()
-        Number of cores used for parallel computing.
-
-
-    Returns
-    -------
-    list of tuples in the form
-        [(X,X_knockoff.1),(X,X_knockoff.2),...,(X,X_knockoff.n_copy)]
-
-    """
-    X = pd.DataFrame(X).copy()
-    n,p = X.shape
-    names = X.columns
-    is_Cat = Cat_or_Num(X)
-
-    if scaling : Scale_Numeric(X, is_Cat)
-
-    def one_copy(i) : return method(X,is_Cat)
-    return list(Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy)))
-
-
-
-
-# *****************************************************************************
-##
-###
-####
-###
-##
-#
 #### KnockOff Filter ==========================================================
 
-def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, impStat = basicImp_ContinuousResponse, n_aggregate = 20, acceptance_rate = 0.6, plotting = True, plot_Threshold = True, plot_Legend = True, trueBeta_for_FDP = None, appendTitle = '', n_parallel=cpu_count()):
+from multiprocessing import cpu_count
+
+def KnockOff_Filter(X, y, FDR=0.1, method=KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Feature_Importance.basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', n_parallel=cpu_count()):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -91,12 +36,12 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
         ( NOTE - For categorical features with multiple(>2) levels , pass it in original form, not in '0-1 encoded' form. Otherwise there will be more than one dummy column related to a single feature , but the model treat them as independent and can return knockoff copy with more than one 1 in a dummy row )
 
     y : Series or 1D-array ; for Series index=index_of_data , for array length=number_of_index_in_data
-        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=basicImp_ContinuousResponse , for binary case use impStat=basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
+        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=Feature_Importance.basicImp_ContinuousResponse , for binary case use impStat=Feature_Importance.basicImp_BinaryResponse , for multiple catogory case use impStat=Feature_Importance.LOFO_ImpCategorical etc.
 
     FDR : float between [0,1] or list of such float values ; default 0.1
         The False Discovery Rate upperbound to be specified.
 
-    method : any function that creates X_knockoff ; default sKnockOff ; not needed if Xs_Xknockoffs=True
+    method : any function that creates X_knockoff ; default KnockOff_Generating.sKnockOff ; not needed if Xs_Xknockoffs=True
         This function should take input-
             * X : DataMatrix
             * is_Cat : an array indicating which column is Categorical(True) , which one is Numerical(False)
@@ -105,7 +50,7 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
     Xs_Xknockoffs : bool ; default False
         Whether in the data KnockOff copies are already inputted(True) or they are yet to be generated(False).
 
-    impStat : any function that computes feature importance & threshold for selection ; default basicImp_ContinuousResponse.
+    impStat : any function that computes feature importance & threshold for selection ; default Feature_Importance.basicImp_ContinuousResponse
         This function should -
             * take input X, X_knockoff , y , FDR
             * produce output as importance statistics corresponding to features , followed by threshold values
@@ -130,34 +75,30 @@ def KnockOff_Filter(X, y, FDR = 0.1, method = sKnockOff, Xs_Xknockoffs = False, 
     Returns
     -------
     a dict of the form
-        {
-            'SelectedFeature_Names' : Names of the selected variables.
+            {
+                'FDR_level':{
 
-            'SelectedFeature_Indicators' : Indicator of Selection (True/False).
+                    'SelectedFeature_Names' : Names of the selected variables.
 
-            'FDP' : empirical FDR (if true coefficients are known).
-        }
+                    'SelectedFeature_Indicators' : Indicator of Selection (True= selected,False= rejected).
+
+                    'FDP' : empirical FDR (if true coefficients are known).}
+
+
+                'ImportanceScores_&_Thresholds' : Feature Importance scores and the Threshold values for selection/rejection
+            }
 
     """
 
    ## generating Feature Importance Stats ------------------
     if not Xs_Xknockoffs :
-        X = pd.DataFrame(X).copy()
-        n,p = X.shape
-        names = X.columns
-        is_Cat = Cat_or_Num(X)
-        Scale_Numeric(X, is_Cat)
-
-        def this_is_the_main_job(i) :
-            X_,X_knockoff = method(X,is_Cat)
-            return impStat(X_,X_knockoff,y,FDR)
-        DATA = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(this_is_the_main_job)(i) for i in range(n_aggregate)),index=range(n_aggregate))
-
-    else : DATA = scoreMulti(X,y,FDR,impStat,n_parallel)
-
+        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,method,True,n_parallel)
+        DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel)
+    else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel)
 
    ## Filtering ---------------------------------------------
-    returnValue = applyFilter(DATA, FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
+    returnValue = Derandomized_Decision.applyFilter(DATA, FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
+    returnValue['ImportanceScores_&_Thresholds'] = DATA
     return returnValue
 
 
