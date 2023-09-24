@@ -8,6 +8,7 @@ Topic: Simulates random DataMatrix and Gives some visualization
 from Basics import *
 
 
+
 #### Simulate Samples =========================================================
 
 def simulateIndependent(n_obs,col_type,NUM=lambda size: np.random.normal(0,1,size),CAT=lambda size: np.random.choice(['A','B','C','D'],size,replace=True)):
