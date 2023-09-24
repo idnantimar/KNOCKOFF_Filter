@@ -35,7 +35,7 @@ MMD_score = lambda P1,P2,kernel_type : kernel_Z1Z2(P1,metric_type=kernel_type) +
 
 def MMD_checkQuality(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=20,set_seed=None,kernel_type='rbf'):
     """
-    let 
+    let
        * LHS = [X1st,X1st_knockoff]
        * RHS = anySwap([X2nd,X2nd_knockoff])
        * kernel_Z1Z2 = estimated_<E[Phi(Z1)],E[Phi(Z2)]> , where Z1 & Z2 are two independent random variables , Phi() some feature map
