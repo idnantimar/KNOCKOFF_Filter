@@ -6,75 +6,55 @@ Topic: Based on feature importance & threshold , determines which features to be
 """
 
 from Basics import *
-from joblib import Parallel, delayed
 
 
-
-#### Scores based on multilple KnockOff copies ================================
-
-def scoreMulti(combinedData,y,FDR,impStat,n_parallel):
-    """
-    When we have multiple KnockOff copies corresponding to same DataMatrix, based on each of them we can compute one possible feature importance. Goal is to make one overall decision based on them.
-
-    Parameters
-    ----------
-    combinedData : list of tuples in the form
-        [(X,X_knockoff.1),(X,X_knockoff.2),...,(X,X_knockoff.n_copy)]
-
-    y : Series or 1D-array ; for Series index=index_of_data , for array length=number_of_index_in_data
-        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=basicImp_ContinuousResponse , for binary case use impStat=basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
-
-    FDR : float between [0,1] or list of such float values
-        The False Discovery Rate upperbound to be specified.
-
-    impStat : any function that computes feature importance & threshold for selection
-        This function should -
-            * take input X, X_knockoff , y , FDR
-            * produce output as importance statistics corresponding to features , followed by threshold values
-
-    n_parallel : int
-        Number of cores used for parallel computing.
-
-
-    Returns
-    -------
-    DataFrame of size (number_of_knockoff_copy, number_of_features+number_of_FDR_input)
-    where -
-        * each row corresponds to one copy,
-        * initial columns are feature importance scores corresponding to various features
-        * last columns are cut-off values corresponding to FDR control
-
-    """
-
-    lenKnockOff = len(combinedData)
-    def score_for_one_copy(i) :
-        X_,X_knockoff = combinedData[i]
-        return impStat(X_,X_knockoff,y,FDR)
-
-    return pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
-
-
-
-# *****************************************************************************
-##
-###
-####
-###
-##
-#
 #### Filtering ================================================================
 
 def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle=''):
     """
     When we have multiple KnockOff copies corresponding to same DataMatrix, based on each of them we can compute one possible feature importance. Goal is to make one overall decision based on them.
 
-    If we have a DataFrame of size (number_of_knockoff_copy, number_of_features+number_of_FDR_input) , where -
-        * each row corresponds to one copy,
-        * initial columns are feature importance scores corresponding to various features,
-        * last columns are cut-off values corresponding to FDR control
-    this function creates derandomized decision based on available iterations regarding "which feature should be accepted/rejected for FDR control" , i.e. only those features are finally selected which are selected >=n_aggregate*acceptance_rate times individually.
+    This function creates derandomized decision based on available iterations regarding "which feature should be accepted/rejected for FDR control" , i.e. only those features are finally selected which are selected >=n_aggregate*acceptance_rate times individually.
+
+    Parameters
+    ----------
+    DATA : a DataFrame of size (number_of_knockoff_copy, number_of_features+number_of_FDR_input)
+            * each row corresponds to one copy,
+            * initial columns are feature importance scores corresponding to various features,
+            * last columns are cut-off values corresponding to FDR control
+
+    FDR : float between [0,1] or list of such float values ; default 0.1
+        The False Discovery Rate upperbound to be specified.
+
+    acceptance_rate : float between [0,1] ; default 0.60
+        In derandomization , a feature will be accepted if it is accepted in >=n_aggregate*acceptance_rate times individually.
+
+    trueBeta_for_FDP : array of bool ; default None
+        If we know which features are actually important(True) and which ones are null feature(False) , we can input it to compute empirical FDR.
+
+    plotting, plot_Threshold, plot_Legend : bool ; default True
+
+    appendTitle : string ; default ''
+
+    Returns
+    -------
+    a dict of the form
+            {
+                'FDR_level':{
+
+                    'SelectedFeature_Names' : Names of the selected variables.
+
+                    'SelectedFeature_Indicators' : Indicator of Selection (True= selected,False= rejected).
+
+                    'FDP' : empirical FDR (if true coefficients are known).}
+
+
+                'ImportanceScores_&_Thresholds' : Feature Importance scores and the Threshold values for selection/rejection
+            }
+
 
     """
+
     FDRs = np.array(FDR).ravel()
     lenFDR = len(FDRs)
     CutOffs = DATA.iloc[:,-lenFDR:]
