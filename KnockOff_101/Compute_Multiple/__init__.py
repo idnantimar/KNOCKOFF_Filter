@@ -16,6 +16,27 @@ from . import KnockOff_Generating,Feature_Importance
 #### for parallel computation .....................................
 from joblib import Parallel, delayed
 from multiprocessing import cpu_count
+#### for progress bar .............................................
+import contextlib,joblib
+from tqdm import tqdm
+
+@contextlib.contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
+        def __call__(self, *args, **kwargs):
+            tqdm_object.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        tqdm_object.close()
+
+# .................................................................
 
 
 #### Generating Multiple KnockOff copies at a time ============================
@@ -60,7 +81,10 @@ def genMulti(X, n_copy, method=KnockOff_Generating.sKnockOff, scaling=True, n_pa
 
     def one_copy(i) : return method(X,is_Cat)
 
-    return list(Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy)))
+    with tqdm_joblib(tqdm(desc="Progress_Bar & expected remaining time", total=n_copy,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+        OUT = Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy))
+        
+    return OUT
 
 
 
@@ -112,9 +136,10 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance.basicImp_Con
     def score_for_one_copy(i) :
         X_,X_knockoff = combinedData[i]
         return impStat(X_,X_knockoff,y,FDR)
+    
+    with tqdm_joblib(tqdm(desc="Progress_Bar & expected remaining time", total=lenKnockOff,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+        OUT = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
 
-    return pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
-
-
+    return OUT
 
 # *****************************************************************************
