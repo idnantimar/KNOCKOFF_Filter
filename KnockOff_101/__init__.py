@@ -28,7 +28,7 @@ from . import Derandomized_Decision
 
 from multiprocessing import cpu_count
 
-def KnockOff_Filter(X, y, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Compute_Multiple.Feature_Importance.basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', n_parallel=cpu_count()):
+def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Compute_Multiple.Feature_Importance._basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', n_parallel=cpu_count(), set_seed=None):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -43,6 +43,9 @@ def KnockOff_Filter(X, y, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.s
     y : Series or 1D-array ; for Series index=index_of_data , for array length=number_of_index_in_data
         The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=basicImp_ContinuousResponse , for binary case use impStat=basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
 
+    is_Cat : list or array of True/False values ; not needed for Xs_Xknockoffs=True
+        Each element determines whether the corresponding column of X is of Categorical(True) or Numerical(False) type.
+
     FDR : float between [0,1] or list of such float values ; default 0.1
         The False Discovery Rate upperbound to be specified.
 
@@ -55,7 +58,7 @@ def KnockOff_Filter(X, y, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.s
     Xs_Xknockoffs : bool ; default False
         Whether in the data KnockOff copies are already inputted(True) or they are yet to be generated(False).
 
-    impStat : any function that computes feature importance & threshold for selection ; default basicImp_ContinuousResponse
+    impStat : any function that computes feature importance & threshold for selection ; default _basicImp_ContinuousResponse
         This function should -
             * take input X, X_knockoff , y , FDR
             * produce output as importance statistics corresponding to features , followed by threshold values
@@ -75,7 +78,10 @@ def KnockOff_Filter(X, y, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.s
 
     n_parallel : int ; default cpu_count()
         Number of cores used for parallel computing.
-
+        
+    set_seed : seed for reproducable outcome ; default None
+        (Since parallel computing is used, setting a seed ouside this function can not generate reproducable output.)
+   
 
     Returns
     -------
@@ -97,12 +103,12 @@ def KnockOff_Filter(X, y, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.s
 
    ## generating Feature Importance Stats ------------------
     if not Xs_Xknockoffs :
-        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,method,True,n_parallel)
-        DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel)
-    else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel)
+        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,is_Cat,method,True,n_parallel,set_seed)
+        DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel,set_seed)
+    else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel,set_seed)
 
    ## Filtering ---------------------------------------------
-    returnValue = Derandomized_Decision.applyFilter(DATA, FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
+    returnValue = Derandomized_Decision.applyFilter(DATA,FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
     returnValue['ImportanceScores_&_Thresholds'] = DATA
     return returnValue
 
