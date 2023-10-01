@@ -28,7 +28,7 @@ from . import Derandomized_Decision
 
 from multiprocessing import cpu_count
 
-def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Compute_Multiple.Feature_Importance._basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', n_parallel=cpu_count(), set_seed=None):
+def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Compute_Multiple.Feature_Importance._basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, n_parallel=cpu_count(), plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', plot_Scale_width_and_height=(1,1)):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -69,19 +69,18 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
     acceptance_rate : float between [0,1] ; default 0.60
         In derandomization , a feature will be accepted if it is accepted in >=n_aggregate*acceptance_rate times individually.
 
+    n_parallel : int ; default cpu_count()
+        Number of cores used for parallel computing.
+
     plotting, plot_Threshold, plot_Legend : bool ; default True
 
     trueBeta_for_FDP : array of bool ; default None
         If we know which features are actually important(True) and which ones are null feature(False) , we can input it to compute empirical FDR.
 
     appendTitle : string ; default ''
+    
+    plot_Scale_width_and_height : a tuple of the form (w,h) ; default (1,1)
 
-    n_parallel : int ; default cpu_count()
-        Number of cores used for parallel computing.
-        
-    set_seed : seed for reproducable outcome ; default None
-        (Since parallel computing is used, setting a seed ouside this function can not generate reproducable output.)
-   
 
     Returns
     -------
@@ -103,12 +102,12 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
 
    ## generating Feature Importance Stats ------------------
     if not Xs_Xknockoffs :
-        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,is_Cat,method,True,n_parallel,set_seed)
-        DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel,set_seed)
-    else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel,set_seed)
+        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,is_Cat,method,True,n_parallel)
+        DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel)
+    else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel)
 
    ## Filtering ---------------------------------------------
-    returnValue = Derandomized_Decision.applyFilter(DATA,FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle)
+    returnValue = Derandomized_Decision.applyFilter(DATA,FDR,acceptance_rate,trueBeta_for_FDP,plotting,plot_Threshold,plot_Legend,appendTitle,plot_Scale_width_and_height)
     returnValue['ImportanceScores_&_Thresholds'] = DATA
     return returnValue
 
