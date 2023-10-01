@@ -41,7 +41,7 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
         ( NOTE - For categorical features with multiple(>2) levels , pass it in original form, not in '0-1 encoded' form. Otherwise there will be more than one dummy column related to a single feature , but the model treat them as independent and can return knockoff copy with more than one 1 in a dummy row )
 
     y : Series or 1D-array ; for Series index=index_of_data , for array length=number_of_index_in_data
-        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=basicImp_ContinuousResponse , for binary case use impStat=basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
+        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=_basicImp_ContinuousResponse , for binary case use impStat=_basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
 
     is_Cat : list or array of True/False values ; not needed for Xs_Xknockoffs=True
         Each element determines whether the corresponding column of X is of Categorical(True) or Numerical(False) type.
