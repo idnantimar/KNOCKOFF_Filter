@@ -10,7 +10,7 @@ from .Basics import *
 
 #### Filtering ================================================================
 
-def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle=''):
+def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True,plot_Threshold=True,plot_Legend=True,appendTitle='',plot_Scale_width_and_height=(1,1)):
     """
     When we have multiple KnockOff copies corresponding to same DataMatrix, based on each of them we can compute one possible feature importance. Goal is to make one overall decision based on them.
 
@@ -35,6 +35,8 @@ def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True
     plotting, plot_Threshold, plot_Legend : bool ; default True
 
     appendTitle : string ; default ''
+
+    plot_Scale_width_and_height : a tuple of the form (w,h) ; default (1,1)
 
     Returns
     -------
@@ -84,7 +86,8 @@ def applyFilter(DATA,FDR,acceptance_rate=0.6,trueBeta_for_FDP=None,plotting=True
 
        ## Plotting -----------------------------------------
         if plotting:
-           plt.figure(figsize=(10,0.25*len(names)))
+           w,h = plot_Scale_width_and_height
+           plt.figure(figsize=(w*10,h*0.25*len(names)))
            plt.boxplot(W.iloc[:,:-1],vert=False,labels=names,
                        patch_artist=True,boxprops=dict(facecolor='grey'),medianprops = dict(color="blue",linewidth=2))
            if plot_Threshold : plt.axvline(x=np.median(W.iloc[:,-1]),linestyle='--',color='r',linewidth=1.5)
