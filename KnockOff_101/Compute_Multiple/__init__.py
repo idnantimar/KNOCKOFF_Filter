@@ -112,7 +112,7 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_Co
         [(X,X_knockoff.1),(X,X_knockoff.2),...,(X,X_knockoff.n_copy)]
 
     y : Series or 1D-array ; for Series index=index_of_data , for array length=number_of_index_in_data
-        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=basicImp_ContinuousResponse , for binary case use impStat=basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
+        The response variable. Can be continuous or categorical anything , but impStat should be chosen accordingly.e.g. - for continuous case use impStat=_basicImp_ContinuousResponse , for binary case use impStat=_basicImp_BinaryResponse , for multiple catogory case use impStat=LOFO_ImpCategorical etc.
 
     FDR : float between [0,1] or list of such float values ; default 0.1
         The False Discovery Rate upperbound to be specified.
