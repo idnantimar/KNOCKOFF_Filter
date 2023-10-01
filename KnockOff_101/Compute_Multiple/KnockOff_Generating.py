@@ -80,7 +80,6 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
         2nd element is the corresponding KnockOff copy
 
     """
-
     X = pd.DataFrame(X).copy()
     n,p = X.shape
     idx = X.index
@@ -88,12 +87,12 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
     names = X.columns # making sure the col names are string , not int
     for name in names[np.array(is_Cat)] : X[name] = X[name].astype('category')
 
-
    ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
 
    ## initialize KnockOff copy --------------------------------
     X_knockoff = pd.DataFrame(index=idx)
+
 
    ## sequencing over columns ---------------------------------
     np.random.seed(seed_for_sample)
@@ -131,10 +130,13 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
              Xj_copy = np.random.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
-    warnings.resetwarnings()
+    warnings.filterwarnings("default", category=ConvergenceWarning)
+    warnings.filterwarnings("default", message="n_components > n_samples", category=UserWarning)   
 
+    
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
+
 
 
 
@@ -181,6 +183,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
         actualZ_knockoff = Z_knockoff[names_knockoff]
         return (actualZ,actualZ_knockoff)
 
+
    ## blockwise knockoff generation ---------------------------
     ORIGINALs = []
     KNOCKOFFs = []
@@ -198,6 +201,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
     
     if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(one_copy)(i) for i in range(n_Blocks)))
     else : OUT = list(map(one_copy,range(n_Blocks)))
+    
     for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
         KNOCKOFFs += [Block_knockoff]
@@ -207,6 +211,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
     X_knockoff = pd.DataFrame(pd.concat(KNOCKOFFs,axis=0),index=idx)
         # we want to recover both row order and column order
 
+
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
 
@@ -214,4 +219,3 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
 
 
 # *****************************************************************************
-
