@@ -6,12 +6,13 @@ Topic: Computing relative Importance of the features and Threshold for selection
 """
 
 from ..Basics import *
-
+from sklearnex import patch_sklearn
+patch_sklearn(verbose=0)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def THRESHOLD(W,FDR=0.1) :
+def _THRESHOLD(W,FDR=0.1) :
     ## based on available feature importance W , determine the threshold for selection/rejection of feature
     T = (np.abs(W)).sort_values(ascending=True)
     def isFDPlessFDR(t):
@@ -46,7 +47,7 @@ def appendTHRESHOLDs(W,FDR):
 
     """
 
-    vTHRESHOLD = np.vectorize(lambda f : THRESHOLD(W,f))
+    vTHRESHOLD = np.vectorize(lambda f : _THRESHOLD(W,f))
     vId = np.vectorize(lambda f : 'THRESHOLD_'+str(f*100))
     Threshold = vTHRESHOLD(FDR)
     vId = vId(FDR).ravel()
@@ -56,14 +57,14 @@ def appendTHRESHOLDs(W,FDR):
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def absDiff(Z1,Z2):
+def _absDiff(Z1,Z2):
     """ array ; |Z1|-|Z2|
     """
     return np.abs(Z1)-np.abs(Z2)
 
 
 
-def signedMax(Z1,Z2):
+def _signedMax(Z1,Z2):
     """array ; max(Z1,Z2).sign(Z1-Z2)
     """
     return np.vstack((Z1,Z2)).max(axis=0)*np.sign(Z1-Z2)
@@ -87,11 +88,12 @@ Constructed in a manner that it can take both +ve & -ve value , and large +ve va
 
 
 from sklearn.linear_model import ElasticNetCV, LogisticRegression
+from sklearn.model_selection import RepeatedStratifiedKFold, RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
 
-def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=None):
+def _basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=_signedMax,seedCV=None):
     """
     Regression Coefficient based importance for continuous response case
     The columns of [X,X_knockoff] should be on same scale
@@ -108,7 +110,7 @@ def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=
 
    ## feature importance ------------------------------------
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
-    Model = (ElasticNetCV(l1_ratio=[0.1,0.5,0.95],random_state=seedCV))
+    Model = ElasticNetCV(l1_ratio=[0.1,0.5,0.8,0.95,0.99],cv=RepeatedKFold(n_repeats=5,n_splits=5,random_state=seedCV))
     Model.fit(pd.concat([X,X_knockoff],axis=1),y)
         # not valid for categorical y, use different statistic accordingly
         # combined data is n*2p , so need n>=2p for identifiability
@@ -126,7 +128,7 @@ def basicImp_ContinuousResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax,seedCV=
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax):
+def _basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=_signedMax,seedCV=None):
     """
     Regression Coefficient based importance for binary response case
     The columns of [X,X_knockoff] should be on same scale
@@ -139,7 +141,9 @@ def basicImp_BinaryResponse(X,X_knockoff,y,FDR=0.1,Scoring=signedMax):
     X_knockoff = pd.get_dummies(X_knockoff, drop_first=True)
    ## feature importance ------------------------------------
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
-    Model = LogisticRegression()
+    if min(Counter(y).values())>=3:  
+        Model = LogisticRegressionCV(Cs=np.logspace(-4,2,num=5),cv=RepeatedStratifiedKFold(n_repeats=5,n_splits=3,random_state=seedCV))
+    else: Model = LogisticRegression(C=0.1)
     Model.fit(pd.concat([X,X_knockoff],axis=1),y)
         # Just linear regression is replaced by Logistic regression
     warnings.filterwarnings("default", category=ConvergenceWarning)
@@ -162,7 +166,7 @@ from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 
 
-def LOFO_ImpCategorical(X, X_knockoff, y, FDR=0.1, seed=None, take_diff=True, Scoring=signedMax):
+def LOFO_ImpCategorical(X, X_knockoff, y, FDR=0.1, seed=None, take_diff=True, Scoring=_signedMax):
     """
     For each column in combined data,
     fit the model y~[X,X_knockoff] once in the presence of that column & once in absence.
@@ -189,7 +193,7 @@ def LOFO_ImpCategorical(X, X_knockoff, y, FDR=0.1, seed=None, take_diff=True, Sc
     take_diff : bool ; default True
         Whether to shift(True) the origin of Z & Z_knockoff axis from (0,0) to full_Model error. Any feature that produces LOFO_error<fullModel_error will be rejected then irrespective of its importance score.
 
-    Scoring : a function that determines how important an original feature is , compared to its knockoff copy ; default signedMax
+    Scoring : a function that determines how important an original feature is , compared to its knockoff copy ; default _signedMax
 
     Returns
     -------
