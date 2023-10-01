@@ -6,6 +6,8 @@ Topic: Generating KnockOff copy of DataMatrix
 """
 
 from ..Basics import *
+from sklearnex import patch_sklearn
+patch_sklearn(verbose=0)
 
 
 #### Sequential KnockOff generation ===========================================
@@ -21,14 +23,31 @@ from ..Basics import *
 
 '''
 
-from sklearn.linear_model import ElasticNetCV, LogisticRegression
-from sklearn.kernel_approximation import RBFSampler
-from sklearn.model_selection import GridSearchCV ,RepeatedStratifiedKFold,RepeatedKFold
+# ........................................................................
+from sklearn.metrics.pairwise import pairwise_distances
+from scipy.spatial.distance import euclidean
+from scipy.stats import norm as normal_distribution
+
+def _RBF_median_heuristic(Z1,Z2=None):
+    D = pairwise_distances(Z1,Z2)
+    sd = np.median(D)
+
+    K = normal_distribution.pdf(D,scale=sd)
+    kern_map = lambda z2,z1 : normal_distribution.pdf(euclidean(z1,z2),scale=sd)
+    return [K,kern_map]
+
+# .........................................................................
+
+
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
+from sklearn.kernel_approximation import Nystroem
+from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold, RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
 
-def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
+def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
     """
     Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
 
@@ -43,11 +62,16 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
     scaling : bool ; default False
         Whether the numerical columns of X will be standardized before further calculation.
 
-    seed_for_sample, seed_for_KernelTrick, seed_for_CV : int ; default None
+    seed_for_sample, seed_for_CVfolds : int ; default None
         Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
 
-    Kernel_nComp : int ; default 100
-        Dimensionality of the feature space(approximate RBF kernel feature map) used in regression.
+    Kernel_Trick : a function ; default _RBF_median_heuristic
+        This function -
+                       * takes two DataMatrix as input
+                       * returns a list of the form [K,kern_map] , where K is the gram-matrix , kern_map is the function to compute corresponding kernel map k(u,v) based on two observations u & v
+
+    Nystroem_nComp : int ; default 100
+        Dimensionality of the feature space(approximate kernel feature map) used in Logistic regression.
 
     Returns
     -------
@@ -62,6 +86,8 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
     idx = X.index
     X.columns = X.columns.astype(str)
     names = X.columns # making sure the col names are string , not int
+    for name in names[np.array(is_Cat)] : X[name] = X[name].astype('category')
+
 
    ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
@@ -69,47 +95,43 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_KernelTri
    ## initialize KnockOff copy --------------------------------
     X_knockoff = pd.DataFrame(index=idx)
 
-   ## kernel trick --------------------------------------------
-    rbf_sampler = RBFSampler(gamma='scale',random_state=seed_for_KernelTrick,n_components=Kernel_nComp)
-
    ## sequencing over columns ---------------------------------
     np.random.seed(seed_for_sample)
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    warnings.filterwarnings("ignore", message="n_components > n_samples", category=UserWarning)
     for j in range(p) :
         name = names[j]
         Xj = X[name] # response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
+        Xj_type = is_Cat[j]
         Xcombined_j = pd.concat([X.drop(name,axis=1),X_knockoff],axis=1) # predictors
-        current_isCat = Cat_or_Num(Xcombined_j)
-        Xcombined_jKernel = rbf_sampler.fit_transform(Xcombined_j.iloc[:,np.invert(current_isCat)]) if (not current_isCat.all()) else Xcombined_j.iloc[:,np.invert(current_isCat)]
-        # kernel trick on numerical columns
-        Xcombined_jCat = Xcombined_j.iloc[:,current_isCat] # categorical columns
+        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
 
-        Xcombined_j = pd.get_dummies(pd.concat([pd.DataFrame(Xcombined_jKernel,index=idx),Xcombined_jCat],axis=1),drop_first=True)
-        Xcombined_j.columns = Xcombined_j.columns.astype(str)
+        K = (Kernel_Trick(Xcombined_j))[Xj_type] # for numerical column, stores the gram-matrix ; otherwise stores the corresponding function
 
-        if is_Cat[j] :
+        if Xj_type :
             #> fit ........................................
-             Model = LogisticRegression()
-             CV_type = RepeatedStratifiedKFold(n_repeats=5,n_splits=3,random_state=seed_for_CV) if min(Counter(Xj).values())>=3 else RepeatedKFold(n_repeats=5,n_splits=3,random_state=seed_for_CV) # stratified K-fold is preferred unless not enough observations available per class
-             Model = (GridSearchCV( Model, param_grid={'C':[0.1,0.4,1,2.5,10]}, scoring='accuracy',cv=CV_type)).fit(Xcombined_j,Xj)
+             Phi = Nystroem(kernel=K,random_state=seed_for_sample,n_components=Nystroem_nComp)
+             K = Phi.fit_transform(Xcombined_j)
+             if min(Counter(Xj).values())>=3:  # cross-validation is preferred unless not enough observations available per class
+                 Model = LogisticRegressionCV(Cs=np.logspace(-4,2,num=5),cv=RepeatedStratifiedKFold(n_repeats=5,n_splits=3,random_state=seed_for_CVfolds))
+             else: Model = LogisticRegression(C=0.1)
+             Model.fit(K,Xj)
              categories = Model.classes_
-             probabilities = pd.DataFrame(Model.predict_proba(Xcombined_j),index=idx)
+             probabilities = pd.DataFrame(Model.predict_proba(K),index=idx)
             #> new sample .................................
              Xj_copy = probabilities.apply(lambda x : np.random.multinomial(1,x), axis=1,result_type='expand').idxmax(axis=1)
-             Xj_copy = categories[Xj_copy]
-
+             Xj_copy = categories[Xj_copy.to_numpy()]
         else :
             #> fit ........................................
-             Model = ElasticNetCV(l1_ratio=[.1, .5, .7, .9, .95, .99, 1],random_state=seed_for_CV)
-             Model.fit(Xcombined_j,Xj)
-             Xj_copy = Model.predict(Xcombined_j)
+             Model = GridSearchCV(KernelRidge(kernel='precomputed'),param_grid={'alpha':np.logspace(-1,4,num=5)},cv=RepeatedKFold(n_repeats=5,n_splits=5,random_state=seed_for_CVfolds))
+             Model.fit(K,Xj)
+             Xj_copy = Model.predict(K)
              s = np.std(Xj-Xj_copy)
             #> new sample ..................................
              Xj_copy = np.random.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
-
-    warnings.filterwarnings("default", category=ConvergenceWarning)
+    warnings.resetwarnings()
 
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
@@ -127,11 +149,11 @@ from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
 
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, seed_for_sample=None, seed_for_KernelTrick=None, seed_for_CV=None, Kernel_nComp=100) :
+def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
     """
     This function splits the data in a few blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
 
-    WARNING: takes too much time than ogiginal sKnockOff method, but easily parallelizable.
+    WARNING: takes much more time than ogiginal sKnockOff method, but easily parallelizable.
 
     """
     X = pd.DataFrame(X).copy()
@@ -140,6 +162,7 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
     X.columns = X.columns.astype(str)
     names = X.columns
     names_knockoff = np.vectorize(lambda name: (name+'_kn.off'))(names)
+    for name in names[np.array(is_Cat)] : X[name] = X[name].astype('category')
 
    ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
@@ -148,7 +171,6 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
     Blocks = list(KFold(n_Blocks,shuffle=True,random_state=seed_for_randomizing).split(X))
 
    ## random shuffle ------------------------------------------
-    np.random.seed(seed_for_randomizing)
     def Shuffle(Z):
         S = np.random.choice(range(p),size=p,replace=False)
         shuffled_Data = Z.iloc[:,S]
@@ -166,12 +188,16 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
         ix = Blocks[i][1]
         Block = X.iloc[ix]
         Block,is_Cat_i = Shuffle(Block)
-        Block,Block_knockoff = sKnockOff(Block, is_Cat_i, False, seed_for_sample, seed_for_KernelTrick, seed_for_CV, Kernel_nComp)
+        Block,Block_knockoff = sKnockOff(Block,is_Cat_i,False,seed_for_sample,seed_for_CVfolds,Kernel_Trick,Nystroem_nComp)
         return ShuffleBack(Block, Block_knockoff)
-
-
-    if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel)(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
-    else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
+    if any([seed_for_sample,seed_for_randomizing]): 
+        def one_copy(i):
+            np.random.seed(i)
+            return blockwise_KnockOff(i)
+    else : one_copy = blockwise_KnockOff 
+    
+    if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(one_copy)(i) for i in range(n_Blocks)))
+    else : OUT = list(map(one_copy,range(n_Blocks)))
     for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
         KNOCKOFFs += [Block_knockoff]
@@ -188,3 +214,4 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
 
 
 # *****************************************************************************
+
