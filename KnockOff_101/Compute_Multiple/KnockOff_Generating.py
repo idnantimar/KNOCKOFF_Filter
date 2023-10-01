@@ -105,7 +105,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
         Xcombined_j = pd.concat([X.drop(name,axis=1),X_knockoff],axis=1) # predictors
         Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
 
-        K = (Kernel_Trick(Xcombined_j))[Xj_type] # for numerical column, stores the gram-matrix ; otherwise stores the corresponding function
+        K = (Kernel_Trick(Xcombined_j))[int(Xj_type)] # for numerical column, stores the gram-matrix ; otherwise stores the corresponding function
 
         if Xj_type :
             #> fit ........................................
