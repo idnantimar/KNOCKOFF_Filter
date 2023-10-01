@@ -38,10 +38,13 @@ def tqdm_joblib(tqdm_object):
 
 # .................................................................
 
+"""
+NOTE: It is hard to obtain reproducable output at this level , instead try to set seed on individual functions , if needed.
+"""
 
 #### Generating Multiple KnockOff copies at a time ============================
 
-def genMulti(X, n_copy, is_Cat, method=KnockOff_Generating.sKnockOff, scaling=True, n_parallel=cpu_count(), set_seed=None):
+def genMulti(X, n_copy, is_Cat, method=KnockOff_Generating.sKnockOff, scaling=True, n_parallel=cpu_count()):
     """
     Generates multiple KnockOff copies of a same DataMatrix.
 
@@ -68,9 +71,6 @@ def genMulti(X, n_copy, is_Cat, method=KnockOff_Generating.sKnockOff, scaling=Tr
     n_parallel : int ; default cpu_count()
         Number of cores used for parallel computing.
 
-    set_seed : seed for reproducable outcome ; default None
-        (Since parallel computing is used, setting a seed ouside this function can not generate reproducable output.)
-
     Returns
     -------
     list of tuples in the form
@@ -83,14 +83,9 @@ def genMulti(X, n_copy, is_Cat, method=KnockOff_Generating.sKnockOff, scaling=Tr
 
     if scaling : Scale_Numeric(X, is_Cat)
 
-    if set_seed is None : 
-        def one_copy(i) : return method(X,is_Cat)
-    else :
-        def one_copy(i) : 
-            np.random.seed(set_seed+i)
-            return method(X,is_Cat)
+    def one_copy(i) : return method(X,is_Cat)
  
-    with tqdm_joblib(tqdm(desc="Progress_Bar & expected remaining time", total=n_copy,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+    with tqdm_joblib(tqdm(desc="Progress_Bar(Generating KnockOff copies...) & expected remaining time", total=n_copy,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
         OUT = Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy))
         
     return OUT
@@ -107,7 +102,7 @@ def genMulti(X, n_copy, is_Cat, method=KnockOff_Generating.sKnockOff, scaling=Tr
 #
 #### Scores based on multilple KnockOff copies ================================
 
-def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_ContinuousResponse, n_parallel=cpu_count(), set_seed=None):
+def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_ContinuousResponse, n_parallel=cpu_count()):
     """
     When we have multiple KnockOff copies corresponding to same DataMatrix, based on each of them we can compute one possible feature importance. Goal is to make one overall decision based on them.
 
@@ -130,8 +125,6 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_Co
     n_parallel : int ; default cpu_count()
         Number of cores used for parallel computing.
 
-    set_seed : seed for reproducable outcome ; default None
-        (Since parallel computing is used, setting a seed ouside this function can not generate reproducable output.)
 
     Returns
     -------
@@ -144,17 +137,12 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_Co
     """
 
     lenKnockOff = len(combinedData)
-    if set_seed is None :
-        def score_for_one_copy(i) :
-            X_,X_knockoff = combinedData[i]
-            return impStat(X_,X_knockoff,y,FDR)
-    else :
-        def score_for_one_copy(i) :
-            np.random.seed(set_seed+i)
-            X_,X_knockoff = combinedData[i]
-            return impStat(X_,X_knockoff,y,FDR)
+
+    def score_for_one_copy(i) :
+        X_,X_knockoff = combinedData[i]
+        return impStat(X_,X_knockoff,y,FDR)
         
-    with tqdm_joblib(tqdm(desc="Progress_Bar & expected remaining time", total=lenKnockOff,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+    with tqdm_joblib(tqdm(desc="Progress_Bar(Feature Importance Ordering...) & expected remaining time", total=lenKnockOff,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
         OUT = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
 
     return OUT
@@ -163,3 +151,4 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_Co
 
 
 # *****************************************************************************
+
