@@ -91,7 +91,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
     if scaling : Scale_Numeric(X,is_Cat)
 
    ## initialize KnockOff copy --------------------------------
-    X_knockoff = pd.DataFrame(index=idx)
+    X_knockoff = pd.DataFrame(index=idx,columns=np.vectorize(lambda name: (name+'_kn.off'))(names))
 
 
    ## sequencing over columns ---------------------------------
