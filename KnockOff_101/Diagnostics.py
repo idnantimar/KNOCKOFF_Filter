@@ -32,8 +32,13 @@ def _RBF_median_heuristic(Z1,Z2=None,k=1):
     D = squareform(D)
     if Z2 is not None :
         n = len(Z1)
-        D = D[:n,n:]
-    K = normal_distribution.pdf(D,scale=sd)
+        D11 = D[:n,:n]
+        D12 = D[:n,n:]
+        D22 = D[n:,n:]
+        K = (normal_distribution.pdf(D11,scale=sd),
+             normal_distribution.pdf(D12,scale=sd),
+             normal_distribution.pdf(D22,scale=sd))
+    else : K = normal_distribution.pdf(D,scale=sd)
     kern_map = lambda z2,z1 : normal_distribution.pdf(euclidean(z1,z2),scale=sd)
     return [K,kern_map,sd]
 
@@ -42,7 +47,7 @@ def _RBF_median_heuristic(Z1,Z2=None,k=1):
 import random
 from sklearn.metrics.pairwise import pairwise_kernels
 
-def MMD_checkQuality(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=20,set_seed=None):
+def MMD_checkQuality(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=10,set_seed=None):
     """
     let
        * LHS = [X1st,X1st_knockoff]
@@ -64,18 +69,18 @@ def MMD_checkQuality(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=20,set_
         col_ix[swappable] += p
         col_ix[(swappable+p)] -= p
         return fullSwap_RHS.iloc[:,col_ix]
-    k = lambda Z1,Z2=None : pairwise_kernels(Z1,Z2,metric=_RBF_median_heuristic(LHS,fullSwap_RHS)[1])
-    score = [_E_kernel_Z1Z2(k(LHS))
-             + _E_kernel_Z1Z2(k(fullSwap_RHS))
-             - 2*_E_kernel_Z1Z2(k(LHS,fullSwap_RHS))]
+    K11,K12,K22 = _RBF_median_heuristic(LHS,fullSwap_RHS)[0]
+    score = [_E_kernel_Z1Z2(K11)
+             + _E_kernel_Z1Z2(K22)
+             - 2*_E_kernel_Z1Z2(K12)]
     random.seed(set_seed)
     np.random.seed(set_seed)
     for _ in range(n_partialSwap):
         partialSwap_RHS = partialSwap()
-        k = lambda Z1,Z2=None : pairwise_kernels(Z1,Z2,metric=_RBF_median_heuristic(LHS,partialSwap_RHS)[1])
-        score += [_E_kernel_Z1Z2(k(LHS))
-                 + _E_kernel_Z1Z2(k(partialSwap_RHS))
-                 - 2*_E_kernel_Z1Z2(k(LHS,partialSwap_RHS))]
+        K11,K12,K22 = _RBF_median_heuristic(LHS,partialSwap_RHS)[0]
+        score += [_E_kernel_Z1Z2(K11)
+                 + _E_kernel_Z1Z2(K22)
+                 - 2*_E_kernel_Z1Z2(K12)]
     return np.mean(score)
 
 
