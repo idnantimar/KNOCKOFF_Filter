@@ -53,7 +53,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
 
     Kernel_Trick : a function ; default _RBF_median_heuristic
         This function -
-                       * takes two DataMatrix as input
+                       * takes the DataMatrix as input
                        * returns a list of the form [K,kern_map] , where K is the gram-matrix , kern_map is the function to compute corresponding kernel map k(u,v) based on two observations u & v
 
     Nystroem_nComp : int ; default 100
@@ -117,9 +117,9 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
 
         X_knockoff[name+'_kn.off'] = Xj_copy
     warnings.filterwarnings("default", category=ConvergenceWarning)
-    warnings.filterwarnings("default", message="n_components > n_samples", category=UserWarning)   
+    warnings.filterwarnings("default", message="n_components > n_samples", category=UserWarning)
 
-    
+
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
 
@@ -137,7 +137,8 @@ from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
 
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
+def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
+                       method=lambda Data,feature_types : sKnockOff(Data,feature_types,scaling=False,seed_for_sample=None,seed_for_CVfolds=None,Kernel_Trick=_RBF_median_heuristic,Nystroem_nComp=100)) :
     """
     This function splits the data in a few blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
 
@@ -177,17 +178,17 @@ def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_
         ix = Blocks[i][1]
         Block = X.iloc[ix]
         Block,is_Cat_i = Shuffle(Block)
-        Block,Block_knockoff = sKnockOff(Block,is_Cat_i,False,seed_for_sample,seed_for_CVfolds,Kernel_Trick,Nystroem_nComp)
+        Block,Block_knockoff = method(Block,is_Cat_i)
         return ShuffleBack(Block, Block_knockoff)
-    if any([seed_for_sample,seed_for_randomizing]): 
+    if seed_for_randomizing is not None:
         def one_copy(i):
-            np.random.seed(i)
+            np.random.seed(i+seed_for_randomizing)
             return blockwise_KnockOff(i)
-    else : one_copy = blockwise_KnockOff 
-    
+    else : one_copy = blockwise_KnockOff
+
     if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(one_copy)(i) for i in range(n_Blocks)))
     else : OUT = list(map(one_copy,range(n_Blocks)))
-    
+
     for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
         KNOCKOFFs += [Block_knockoff]
