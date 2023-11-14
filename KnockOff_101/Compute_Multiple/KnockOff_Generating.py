@@ -23,25 +23,11 @@ patch_sklearn(verbose=0)
 
 '''
 
-# ........................................................................
-from sklearn.metrics.pairwise import pairwise_distances
-from scipy.spatial.distance import euclidean
-from scipy.stats import norm as normal_distribution
-
-def _RBF_median_heuristic(Z1,Z2=None):
-    D = pairwise_distances(Z1,Z2)
-    sd = np.median(D)
-
-    K = normal_distribution.pdf(D,scale=sd)
-    kern_map = lambda z2,z1 : normal_distribution.pdf(euclidean(z1,z2),scale=sd)
-    return [K,kern_map]
-
-# .........................................................................
-
 
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.kernel_approximation import Nystroem
+from ..Diagnostics import _RBF_median_heuristic
 from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold, RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
