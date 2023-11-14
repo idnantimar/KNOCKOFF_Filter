@@ -137,12 +137,12 @@ from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
 
 
-def sKnockOff_Modified(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
+def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
                        method=lambda Data,feature_types : sKnockOff(Data,feature_types,scaling=False,seed_for_sample=None,seed_for_CVfolds=None,Kernel_Trick=_RBF_median_heuristic,Nystroem_nComp=100)) :
     """
-    This function splits the data in a few blocks , shuffle the order of columns in each block , generate Sequential KnockOff as usual in each block, then reshuffle them back to original order.
+    This function splits the data in a few blocks , shuffles the order of columns in each block , generates KnockOff as usual in each block, then reshuffle them back to original order.
 
-    WARNING: takes much more time than ogiginal sKnockOff method, but easily parallelizable.
+    WARNING: takes much more time than ogiginal KnockOff generating method, but easily parallelizable.
 
     """
     X = pd.DataFrame(X).copy()
