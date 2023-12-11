@@ -24,18 +24,108 @@ patch_sklearn(verbose=0)
 '''
 
 
-from sklearn.kernel_ridge import KernelRidge
-from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
-from sklearn.kernel_approximation import Nystroem
-from ..Diagnostics import _RBF_median_heuristic
+from sklearn.linear_model import LogisticRegressionCV, LogisticRegression, LinearRegression
 from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold, RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
 
-def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
+
+def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
     """
     Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
+
+    Parameters
+    ----------
+    X : DataFrame or 2D-array ; size=(n,p)
+        The DataMatrix whose KnockOff copy is required to be generated.
+
+    is_Cat : list or array of True/False values ; length=p
+        Each element determines whether the corresponding column of X is of Categorical(True) or Numerical(False) type.
+
+    scaling : bool ; default False
+        Whether the numerical columns of X will be standardized before further calculation.
+
+    seed_for_sample : int ; default None
+        Seeds of various pseudo-random number generation steps, to be specified for reproducable Output.
+
+    Returns
+    -------
+    tuple in the form (X,X_knockoff)
+        1st element is the DataMatrix (after scaling, if any) ;
+        2nd element is the corresponding KnockOff copy
+
+    """
+    X = pd.DataFrame(X).copy()
+    n,p = X.shape
+    idx = X.index
+    X.columns = X.columns.astype(str)
+    names = X.columns # making sure the col names are string , not int
+    is_Cat = np.array(is_Cat)
+    X[names[is_Cat]] = X[names[is_Cat]].astype('category')
+
+   ## standardizing continuous columns ------------------------
+    if scaling : Scale_Numeric(X,is_Cat)
+
+   ## initialize KnockOff copy --------------------------------
+    X_knockoff = pd.DataFrame(index=idx,columns=np.vectorize(lambda name: (name+'_kn.off'))(names))
+    X_knock_current = pd.DataFrame(index=idx) # without initializing the shape, the final knockoff copy will be too much fragmented
+
+   ## sequencing over columns ---------------------------------
+    np.random.seed(seed_for_sample)
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    warnings.filterwarnings("ignore", message="n_components > n_samples", category=UserWarning)
+    for j in range(p) :
+        name = names[j]
+        Xj = X[name] #> response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
+        Xj_type = is_Cat[j]
+        Xcombined_j = pd.concat([X.drop(name,axis=1),X_knock_current],axis=1) #> predictors
+        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
+
+        if Xj_type :
+             Xcombined_j = Xcombined_j.to_numpy()
+            #> fit ........................................
+             Model = LogisticRegression(penalty=None)
+             Model.fit(Xcombined_j,Xj)
+             categories = Model.classes_
+             probabilities = pd.DataFrame(Model.predict_proba(Xcombined_j),index=idx)
+            #> new sample .................................
+             Xj_copy = probabilities.apply(lambda x : np.random.multinomial(1,x), axis=1,result_type='expand').idxmax(axis=1)
+             Xj_copy = categories[Xj_copy.to_numpy()]
+        else :
+            #> fit ........................................
+             Model = LinearRegression()
+             Model.fit(Xcombined_j,Xj)
+             Xj_copy = Model.predict(Xcombined_j)
+             s = np.std(Xj-Xj_copy)
+            #> new sample ..................................
+             Xj_copy = np.random.normal(Xj_copy,s)
+
+        X_knockoff[name+'_kn.off'] = Xj_copy
+        X_knock_current = X_knockoff.iloc[:,:(j+1)]
+
+    warnings.filterwarnings("default", category=ConvergenceWarning)
+    warnings.filterwarnings("default", message="n_components > n_samples", category=UserWarning)
+
+
+   ## KnockOff copy --------------------------------------------
+    return tuple([X,X_knockoff])
+
+
+
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.kernel_approximation import Nystroem
+from ..Diagnostics import _RBF_median_heuristic
+
+
+
+def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
+    """
+    Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
+    Can use any kind of feature map , by specifying corresponding kernel matrix.
 
     Parameters
     ----------
@@ -70,14 +160,16 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
     n,p = X.shape
     idx = X.index
     X.columns = X.columns.astype(str)
-    names = X.columns # making sure the col names are string , not int
-    for name in names[np.array(is_Cat)] : X[name] = X[name].astype('category')
+    names = X.columns
+    is_Cat = np.array(is_Cat)
+    X[names[is_Cat]] = X[names[is_Cat]].astype('category')
 
    ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
 
    ## initialize KnockOff copy --------------------------------
     X_knockoff = pd.DataFrame(index=idx,columns=np.vectorize(lambda name: (name+'_kn.off'))(names))
+    X_knock_current = pd.DataFrame(index=idx)
 
 
    ## sequencing over columns ---------------------------------
@@ -86,18 +178,18 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
     warnings.filterwarnings("ignore", message="n_components > n_samples", category=UserWarning)
     for j in range(p) :
         name = names[j]
-        Xj = X[name] # response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
+        Xj = X[name]
         Xj_type = is_Cat[j]
-        Xcombined_j = pd.concat([X.drop(name,axis=1),X_knockoff],axis=1) # predictors
+        Xcombined_j = pd.concat([X.drop(name,axis=1),X_knock_current],axis=1)
         Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
 
-        K = (Kernel_Trick(Xcombined_j))[int(Xj_type)] # for numerical column, stores the gram-matrix ; otherwise stores the corresponding function
+        K = (Kernel_Trick(Xcombined_j))[int(Xj_type)]
 
         if Xj_type :
             #> fit ........................................
              Phi = Nystroem(kernel=K,random_state=seed_for_sample,n_components=Nystroem_nComp)
              K = Phi.fit_transform(Xcombined_j)
-             if min(Counter(Xj).values())>=3:  # cross-validation is preferred unless not enough observations available per class
+             if min(Counter(Xj).values())>=3: # crossvalidation is preferred , unless very few observation from a category
                  Model = LogisticRegressionCV(Cs=np.logspace(-4,2,num=5),cv=RepeatedStratifiedKFold(n_repeats=5,n_splits=3,random_state=seed_for_CVfolds))
              else: Model = LogisticRegression(C=0.1)
              Model.fit(K,Xj)
@@ -116,6 +208,8 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
              Xj_copy = np.random.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
+        X_knock_current = X_knockoff.iloc[:,:(j+1)]
+
     warnings.filterwarnings("default", category=ConvergenceWarning)
     warnings.filterwarnings("default", message="n_components > n_samples", category=UserWarning)
 
@@ -126,7 +220,13 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=N
 
 
 
-# modified Sequential Knockoff ++++++++++++++++++++++++++++++++++++++++++++++++
+# *****************************************************************************
+##
+###
+####
+###
+##
+# modified Sequential Knockoff ================================================
 '''
  ** It appears that as we move from first feature to last feature , we are modelling the conditional distribution Xj|(X[-j],X_knockoff[1:j-1]) based on larger data available. So there can be systematic bias in quality.
  ** To address this problem , split the data in a few blocks , shuffle the order of columns in each block , generate Sequential Knockoff as usual , then reshuffle them back to original order. Finally stack them together as the beginning
@@ -137,8 +237,8 @@ from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
 
 
-def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
-                       method=lambda Data,feature_types : sKnockOff(Data,feature_types,scaling=False,seed_for_sample=None,seed_for_CVfolds=None,Kernel_Trick=_RBF_median_heuristic,Nystroem_nComp=100)) :
+
+def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, method=sKnockOff) :
     """
     This function splits the data in a few blocks , shuffles the order of columns in each block , generates KnockOff as usual (default method sKnockOff) in each block, then reshuffle them back to original order.
 
@@ -151,7 +251,8 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
     X.columns = X.columns.astype(str)
     names = X.columns
     names_knockoff = np.vectorize(lambda name: (name+'_kn.off'))(names)
-    for name in names[np.array(is_Cat)] : X[name] = X[name].astype('category')
+    is_Cat = np.array(is_Cat)
+    X[names[is_Cat]] = X[names[is_Cat]].astype('category')
 
    ## standardizing continuous columns ------------------------
     if scaling : Scale_Numeric(X,is_Cat)
