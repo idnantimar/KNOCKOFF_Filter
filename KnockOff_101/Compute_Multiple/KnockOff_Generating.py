@@ -116,9 +116,33 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+#> ...............................................................
+from sklearn.metrics.pairwise import pairwise_distances
+from scipy.spatial.distance import euclidean,pdist,squareform
+from scipy.stats import norm as normal_distribution
+
+def _RBF_median_heuristic(Z1,Z2=None,k=1):
+    # RBF kernel with scale=k*(median of observed distances)
+    if Z2 is None : D = pdist(Z1)
+    else : D = pdist(np.vstack((Z1,Z2)))
+    sd = k*np.median(D)
+    D = squareform(D)
+    if Z2 is not None :
+        n = len(Z1)
+        D11 = D[:n,:n]
+        D12 = D[:n,n:]
+        D22 = D[n:,n:]
+        K = (normal_distribution.pdf(D11,scale=sd),
+             normal_distribution.pdf(D12,scale=sd),
+             normal_distribution.pdf(D22,scale=sd))
+    else : K = normal_distribution.pdf(D,scale=sd)
+    kern_map = lambda z2,z1 : normal_distribution.pdf(euclidean(z1,z2),scale=sd)
+    return [K,kern_map,sd]
+# ...............................................................
+
+
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.kernel_approximation import Nystroem
-from ..Diagnostics import _RBF_median_heuristic
 
 
 
