@@ -28,7 +28,12 @@ from . import Derandomized_Decision
 
 from multiprocessing import cpu_count
 
-def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Generating.sKnockOff, Xs_Xknockoffs=False, impStat=Compute_Multiple.Feature_Importance._basicImp_ContinuousResponse, n_aggregate=20, acceptance_rate=0.6, n_parallel=cpu_count(), plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', plot_Scale_width_and_height=(1,1)):
+def KnockOff_Filter(X, y, is_Cat, FDR=0.1,
+                    method= lambda Z,z_type,seed: Compute_Multiple.KnockOff_Generating.sKnockOff(Z,z_type,seed_for_sample=seed), seed_for_sample=None,
+                    knockoff_copy_done_already=False,
+                    impStat=Compute_Multiple.Feature_Importance._basicImp_ContinuousResponse,
+                    n_aggregate=20, shuffle_columns=True, seed_for_shuffle=None, acceptance_rate=0.6, n_parallel=cpu_count(),
+                    plotting=True, plot_Threshold=True, plot_Legend=True, trueBeta_for_FDP=None, appendTitle='', plot_Scale_width_and_height=(1,1)):
     """
     A function to select important features on a dataset , based on FDR control
 
@@ -49,13 +54,16 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
     FDR : float between [0,1] or list of such float values ; default 0.1
         The False Discovery Rate upperbound to be specified.
 
-    method : any function that creates X_knockoff ; default sKnockOff ; not needed if Xs_Xknockoffs=True
-        This function should take input-
-            * X : DataMatrix
-            * is_Cat : an array indicating which column is Categorical(True) , which one is Numerical(False)
-        & produce output (X,X_knockoff) tuple.
+    method : A function that creates X_knockoff ; default sKnockOff
+        This function should take input -
+            * Z : DataMatrix
+            * z_type : an array indicating which column is Categorical(True) , which one is Numerical(False)
+        & produce output (X,X_knockoff) tuple
+            * seed : for reproducible output.
 
-    Xs_Xknockoffs : bool ; default False
+    seed_for_sample : seed to be used in base method for each KnockOff copy.
+
+    knockoff_copy_done_already : bool ; default False
         Whether in the data KnockOff copies are already inputted(True) or they are yet to be generated(False).
 
     impStat : any function that computes feature importance & threshold for selection ; default _basicImp_ContinuousResponse
@@ -65,6 +73,12 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
 
     n_aggregate : int ; default 20 ; not needed if Xs_Xknockoffs=True
         Number of KnockOff copies to be generated from same data for derandomized decision.
+
+    shuffle_columns : bool ; default True
+        Whether the columns of DataMatrix should be shuffled before each iteration
+        (useful to mitigate some systematic bias due to sequential nature of KnockOff generating algorithm).
+
+    seed_for_shuffle : seed for controling the shuffle of the columns , when shuffle_columns=True.
 
     acceptance_rate : float between [0,1] ; default 0.60
         In derandomization , a feature will be accepted if it is accepted in >=n_aggregate*acceptance_rate times individually.
@@ -78,7 +92,7 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
         If we know which features are actually important(True) and which ones are null feature(False) , we can input it to compute empirical FDR.
 
     appendTitle : string ; default ''
-    
+
     plot_Scale_width_and_height : a tuple of the form (w,h) ; default (1,1)
 
 
@@ -101,8 +115,8 @@ def KnockOff_Filter(X, y, is_Cat, FDR=0.1, method=Compute_Multiple.KnockOff_Gene
     """
 
    ## generating Feature Importance Stats ------------------
-    if not Xs_Xknockoffs :
-        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,is_Cat,method,True,n_parallel)
+    if not knockoff_copy_done_already :
+        Xs_Xknockoffs = Compute_Multiple.genMulti(X,n_aggregate,is_Cat,method,seed_for_sample,True,n_parallel,shuffle_columns,seed_for_shuffle)
         DATA = Compute_Multiple.scoreMulti(Xs_Xknockoffs,y,FDR,impStat,n_parallel)
     else : DATA = Compute_Multiple.scoreMulti(X,y,FDR,impStat,n_parallel)
 
