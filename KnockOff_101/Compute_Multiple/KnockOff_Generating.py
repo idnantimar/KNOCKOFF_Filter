@@ -259,6 +259,7 @@ def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_f
 
 from sklearn.model_selection import KFold
 from joblib import Parallel, delayed
+from ..Basics import _seed_sum
 
 
 
@@ -288,7 +289,7 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
     def Shuffle(Z):
         S = np.random.choice(range(p),size=p,replace=False)
         shuffled_Data = Z.iloc[:,S]
-        is_Cat_similarly = list(pd.Series(is_Cat)[S])
+        is_Cat_similarly = is_Cat[S]
         return (shuffled_Data, is_Cat_similarly)
     def ShuffleBack(Z,Z_knockoff):
         actualZ = Z[names]
@@ -305,11 +306,10 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
         Block,is_Cat_i = Shuffle(Block)
         Block,Block_knockoff = method(Block,is_Cat_i)
         return ShuffleBack(Block, Block_knockoff)
-    if seed_for_randomizing is not None:
-        def one_copy(i):
-            np.random.seed(i+seed_for_randomizing)
-            return blockwise_KnockOff(i)
-    else : one_copy = blockwise_KnockOff
+
+    def one_copy(i):
+        np.random.seed(_seed_sum(seed_for_randomizing,i))
+        return blockwise_KnockOff(i)
 
     if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(one_copy)(i) for i in range(n_Blocks)))
     else : OUT = list(map(one_copy,range(n_Blocks)))
