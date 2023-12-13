@@ -37,7 +37,7 @@ def Cat_or_Num(X):
 ##
 #
 #### Scaling Data =============================================================
-def Scale_Numeric(X,is_Cat):
+def Scale_Numeric(X,is_Cat,return_scale=False):
     """ Scales the numerical columns of a data matrix , skips the categorical columns as it is.
         Do not return any new copy , but change the DataFrame in place.
     """
@@ -47,3 +47,17 @@ def Scale_Numeric(X,is_Cat):
 
 
 # *****************************************************************************
+##
+###
+####
+###
+##
+# seed_sum ====================================================================
+def _seed_sum(a,b):
+    # useful for initializing seeds at None
+    if (a is None) or (b is None) : return None
+    else : return a+b
+
+
+# *****************************************************************************
+
