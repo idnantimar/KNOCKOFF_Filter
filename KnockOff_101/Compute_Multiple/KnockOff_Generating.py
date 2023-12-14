@@ -146,7 +146,8 @@ from sklearn.kernel_approximation import Nystroem
 
 
 
-def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=None, Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
+def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_for_CVfolds=None,
+                          Kernel_Trick=_RBF_median_heuristic, Nystroem_nComp=100) :
     """
     Generates KnockOff copy of DataMatrix by 'sequential knockoff' method.
     Can use any kind of feature map , by specifying corresponding kernel matrix.
