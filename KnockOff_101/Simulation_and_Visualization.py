@@ -95,7 +95,7 @@ def simulateJoint(n_obs,popln=lambda size_,rng: rng.multivariate_normal(rng.norm
 ####
 ###
 ##
-# Simulate Response|observed_Predictor ========================================
+#### Simulate Response|observed_Predictor =====================================
 
 from tensorflow.nn import softmax as logOdds_to_probability
 from os import environ as _environ
