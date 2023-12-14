@@ -132,6 +132,7 @@ def Simulate_Categorical(X=simulateIndependent(5,(2,0)),
 
     """
     X = pd.DataFrame(X).copy()
+    Beta_coeffs = np.array(Beta_coeffs)
     X = X.apply(Phi,axis=1,result_type='expand')
     XBeta = np.matmul(X,Beta_coeffs.T)
     Probs = logOdds_to_probability(XBeta).numpy()
