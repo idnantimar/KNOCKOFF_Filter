@@ -72,7 +72,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
     X_knock_current = pd.DataFrame(index=idx) # without initializing the shape, the final knockoff copy will be too much fragmented
 
    ## sequencing over columns ---------------------------------
-    np.random.seed(seed_for_sample)
+    generator0 = RNG(seed_for_sample)
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings("ignore", message="n_components > n_samples", category=UserWarning)
     for j in range(p) :
@@ -88,10 +88,10 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
              Model = LogisticRegression(penalty=None)
              Model.fit(Xcombined_j,Xj)
              categories = Model.classes_
-             probabilities = pd.DataFrame(Model.predict_proba(Xcombined_j),index=idx)
+             probabilities = Model.predict_proba(Xcombined_j)
             #> new sample .................................
-             Xj_copy = probabilities.apply(lambda x : np.random.multinomial(1,x), axis=1,result_type='expand').idxmax(axis=1)
-             Xj_copy = categories[Xj_copy.to_numpy()]
+             Xj_copy = generator0.multinomial(1, probabilities).argmax(axis=1)
+             Xj_copy = categories[Xj_copy]
         else :
             #> fit ........................................
              Model = LinearRegression()
@@ -99,7 +99,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
              Xj_copy = Model.predict(Xcombined_j)
              s = np.std(Xj-Xj_copy)
             #> new sample ..................................
-             Xj_copy = np.random.normal(Xj_copy,s)
+             Xj_copy = generator0.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
         X_knock_current = X_knockoff.iloc[:,:(j+1)]
@@ -197,7 +197,7 @@ def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_f
 
 
    ## sequencing over columns ---------------------------------
-    np.random.seed(seed_for_sample)
+    generator0 = RNG(seed_for_sample)
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings("ignore", message="n_components > n_samples", category=UserWarning)
     for j in range(p) :
@@ -218,10 +218,10 @@ def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_f
              else: Model = LogisticRegression(C=0.1)
              Model.fit(K,Xj)
              categories = Model.classes_
-             probabilities = pd.DataFrame(Model.predict_proba(K),index=idx)
+             probabilities = Model.predict_proba(K)
             #> new sample .................................
-             Xj_copy = probabilities.apply(lambda x : np.random.multinomial(1,x), axis=1,result_type='expand').idxmax(axis=1)
-             Xj_copy = categories[Xj_copy.to_numpy()]
+             Xj_copy = generator0.multinomial(1, probabilities).argmax(axis=1)
+             Xj_copy = categories[Xj_copy]
         else :
             #> fit ........................................
              Model = GridSearchCV(KernelRidge(kernel='precomputed'),param_grid={'alpha':np.logspace(-1,4,num=5)},cv=RepeatedKFold(n_repeats=5,n_splits=5,random_state=seed_for_CVfolds))
@@ -229,7 +229,7 @@ def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_f
              Xj_copy = Model.predict(K)
              s = np.std(Xj-Xj_copy)
             #> new sample ..................................
-             Xj_copy = np.random.normal(Xj_copy,s)
+             Xj_copy = generator0.normal(Xj_copy,s)
 
         X_knockoff[name+'_kn.off'] = Xj_copy
         X_knock_current = X_knockoff.iloc[:,:(j+1)]
@@ -263,7 +263,9 @@ from ..Basics import _seed_sum
 
 
 
-def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed_for_randomizing=None, method=sKnockOff) :
+def KnockOff_Reshuffled(X, is_Cat, scaling=False,
+                        n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
+                        method=lambda Z,z_type,seed: sKnockOff(Z,z_type,seed_for_sample=seed), seed_for_BaseMethod=None) :
     """
     This function splits the data in a few blocks , shuffles the order of columns in each block , generates KnockOff as usual (default method sKnockOff) in each block, then reshuffle them back to original order.
 
@@ -275,7 +277,6 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
     idx = X.index
     X.columns = X.columns.astype(str)
     names = X.columns
-    names_knockoff = np.vectorize(lambda name: (name+'_kn.off'))(names)
     is_Cat = np.array(is_Cat)
     X[names[is_Cat]] = X[names[is_Cat]].astype('category')
 
@@ -286,14 +287,15 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
     Blocks = list(KFold(n_Blocks,shuffle=True,random_state=seed_for_randomizing).split(X))
 
    ## random shuffle ------------------------------------------
-    def Shuffle(Z):
-        S = np.random.choice(range(p),size=p,replace=False)
-        shuffled_Data = Z.iloc[:,S]
-        is_Cat_similarly = is_Cat[S]
-        return (shuffled_Data, is_Cat_similarly)
-    def ShuffleBack(Z,Z_knockoff):
-        actualZ = Z[names]
-        actualZ_knockoff = Z_knockoff[names_knockoff]
+    def Shuffle(Z,rng):
+        col_ix = rng.choice(range(p),size=p,replace=False)
+        shuffled_Data = Z.iloc[:,col_ix]
+        is_Cat_similarly = is_Cat[col_ix]
+        return (shuffled_Data, is_Cat_similarly,col_ix)
+    def ShuffleBack(Z,Z_knockoff,col_ix):
+        inverse_ix = pd.Series(col_ix).sort_values().index
+        actualZ = Z.iloc[:,inverse_ix]
+        actualZ_knockoff = Z_knockoff.iloc[:,inverse_ix]
         return (actualZ,actualZ_knockoff)
 
 
@@ -301,18 +303,15 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False, n_Blocks=3, n_parallel=1, seed
     ORIGINALs = []
     KNOCKOFFs = []
     def blockwise_KnockOff(i):
+        generator_i = RNG(_seed_sum(seed_for_randomizing,i))
         ix = Blocks[i][1]
         Block = X.iloc[ix]
-        Block,is_Cat_i = Shuffle(Block)
-        Block,Block_knockoff = method(Block,is_Cat_i)
-        return ShuffleBack(Block, Block_knockoff)
+        Block,is_Cat_i,col_ix = Shuffle(Block,generator_i)
+        Block,Block_knockoff = method(Block,is_Cat_i,_seed_sum(seed_for_BaseMethod,i))
+        return ShuffleBack(Block,Block_knockoff,col_ix)
 
-    def one_copy(i):
-        np.random.seed(_seed_sum(seed_for_randomizing,i))
-        return blockwise_KnockOff(i)
-
-    if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(one_copy)(i) for i in range(n_Blocks)))
-    else : OUT = list(map(one_copy,range(n_Blocks)))
+    if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
+    else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
 
     for Block,Block_knockoff in OUT :
         ORIGINALs += [Block]
