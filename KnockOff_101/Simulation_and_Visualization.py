@@ -103,7 +103,6 @@ _environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from string import ascii_uppercase
 
 
-
 def Simulate_Categorical(X=simulateIndependent(5,(2,0)),
                          Phi= lambda x: x, return_FeatureMap=False,
                          Beta_coeffs = np.random.randn(3,2),
