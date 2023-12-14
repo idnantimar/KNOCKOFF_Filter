@@ -42,7 +42,7 @@ def simulateIndependent(n_obs,col_type,
         N,C = sum(col_type),len(col_type)-sum(col_type)
 
     NUM_Block = [pd.Series(NUM(n_obs,generator)) for _ in range(N)]
-    CAT_Block = [pd.Series(CAT(n_obs,generator)) for _ in range(C)]
+    CAT_Block = [pd.Series(CAT(n_obs,generator),dtype='object') for _ in range(C)]
     BLOCKs = pd.concat(NUM_Block+CAT_Block,axis=1)
     BLOCKs.columns = [('Num'+str(i)) for i in range(N)] + [('Cat'+str(j)) for j in range(C)]
     col_order = []
