@@ -52,7 +52,10 @@ def Scale_Numeric(X,is_Cat,return_scale=False):
 ####
 ###
 ##
-# seed_sum ====================================================================
+# Random Number ===============================================================
+
+RNG = lambda seed: np.random.default_rng(seed) # RandomNumber_Generator
+
 def _seed_sum(a,b):
     # useful for initializing seeds at None
     if (a is None) or (b is None) : return None
@@ -60,4 +63,3 @@ def _seed_sum(a,b):
 
 
 # *****************************************************************************
-
