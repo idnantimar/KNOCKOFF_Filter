@@ -1,7 +1,8 @@
 """
 Created on Wed Dec 13 23:40:34 2023
 
-Topic: @author: R.Nandi
+Topic: A model-free approach for variable selection, when Response is Categorical.
+@author: R.Nandi
 """
 
 from ..Basics import *
