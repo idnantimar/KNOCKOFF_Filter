@@ -63,7 +63,7 @@ def _testHomogeneity_Categorical(x,y,num_resamples=200,seed_resamples=None):
 
 def modelfree_SelectXj(y,X,is_Cat,level=0.05,
                        case_continuous_=lambda a,b: ks_2samp(a,b).pvalue,
-                       case_categorical_=lambda a,b: _testHomogeneity_Categorical(a,b,num_resamples=200,seed_resamples=None)):
+                       case_categorical_=lambda a,b: _testHomogeneity_Categorical(a,b,num_resamples=500,seed_resamples=None)):
     """
     A model-free approach for variable selection, when Response is Categorical.
 
