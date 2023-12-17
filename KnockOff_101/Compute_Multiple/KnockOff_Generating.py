@@ -24,7 +24,7 @@ patch_sklearn(verbose=0)
 '''
 
 
-from sklearn.linear_model import LogisticRegressionCV, LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold, RepeatedKFold
 import warnings
 from sklearn.exceptions import ConvergenceWarning
@@ -80,7 +80,7 @@ def sKnockOff(X, is_Cat, scaling=False, seed_for_sample=None) :
         Xj = X[name] #> response , in the regression model of the conditional distribution   Xj|(X[-j],X_knockoff[1:j-1])
         Xj_type = is_Cat[j]
         Xcombined_j = pd.concat([X.drop(name,axis=1),X_knock_current],axis=1) #> predictors
-        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
+        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True,dtype=int)
 
         if Xj_type :
              Xcombined_j = Xcombined_j.to_numpy()
@@ -141,6 +141,7 @@ def _RBF_median_heuristic(Z1,Z2=None,k=1):
 # ...............................................................
 
 
+from sklearn.linear_model import LogisticRegressionCV
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.kernel_approximation import Nystroem
 
@@ -206,7 +207,7 @@ def sKnockOff_KernelTrick(X, is_Cat, scaling=False, seed_for_sample=None, seed_f
         Xj = X[name]
         Xj_type = is_Cat[j]
         Xcombined_j = pd.concat([X.drop(name,axis=1),X_knock_current],axis=1)
-        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True)
+        Xcombined_j = pd.get_dummies(Xcombined_j,drop_first=True,dtype=int)
 
         K = (Kernel_Trick(Xcombined_j))[int(Xj_type)]
 
