@@ -42,6 +42,7 @@ def tqdm_joblib(tqdm_object):
 #### Generating Multiple KnockOff copies at a time ============================
 
 from ..Basics import _seed_sum
+from .KnockOff_Generating import _Shuffle,_ShuffleBack
 
 
 def genMulti(X, n_copy, is_Cat,
@@ -98,30 +99,19 @@ def genMulti(X, n_copy, is_Cat,
 
     if scaling : Scale_Numeric(X, is_Cat)
 
-
     if shuffle_columns :
-        def Shuffle(Z,rng):
-            col_ix = rng.choice(range(p),size=p,replace=False)
-            shuffled_Data = Z.iloc[:,col_ix]
-            is_Cat_similarly = is_Cat[col_ix]
-            return (shuffled_Data, is_Cat_similarly,col_ix)
-        def ShuffleBack(Z,Z_knockoff,col_ix):
-            inverse_ix = pd.Series(col_ix).sort_values().index
-            actualZ = Z.iloc[:,inverse_ix]
-            actualZ_knockoff = Z_knockoff.iloc[:,inverse_ix]
-            return (actualZ,actualZ_knockoff)
-
         def one_copy(i) :
             generator_i = RNG(_seed_sum(seed_for_shuffle,i))
-            X_,is_Cat_i,col_ix = Shuffle(X,generator_i)
+            X_,is_Cat_i,col_ix = _Shuffle(X,is_Cat,p,generator_i)
             X_,X_knockoff_ = method(X_,is_Cat_i,_seed_sum(seed_for_BaseMethod,i))
-            return ShuffleBack(X_,X_knockoff_,col_ix)
+            return _ShuffleBack(X_,X_knockoff_,col_ix)
     else :
         def one_copy(i) : return method(X,is_Cat,_seed_sum(seed_for_BaseMethod,i))
 
-
-    with tqdm_joblib(tqdm(desc="Progress_Bar(Generating KnockOff copies...) & expected remaining time", total=n_copy,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
-        OUT = Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy))
+    if n_parallel>1 :
+        with tqdm_joblib(tqdm(desc="Progress_Bar(Generating KnockOff copies...) & expected remaining time", total=n_copy,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+            OUT = Parallel(n_jobs=n_parallel)(delayed(one_copy)(i) for i in range(n_copy))
+    else : OUT = list(map(one_copy,range(n_copy)))
 
     return OUT
 
@@ -177,8 +167,10 @@ def scoreMulti(combinedData, y, FDR=0.1, impStat=Feature_Importance._basicImp_Co
         X_,X_knockoff = combinedData[i]
         return impStat(X_,X_knockoff,y,FDR)
 
-    with tqdm_joblib(tqdm(desc="Progress_Bar(Feature Importance Ordering...) & expected remaining time", total=lenKnockOff,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
-        OUT = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
+    if n_parallel>1 :
+        with tqdm_joblib(tqdm(desc="Progress_Bar(Feature Importance Ordering...) & expected remaining time", total=lenKnockOff,bar_format="{n}/{total}{unit}|{bar}|{desc}|[{remaining}]")) :
+            OUT = pd.DataFrame(Parallel(n_jobs=n_parallel)(delayed(score_for_one_copy)(i) for i in range(lenKnockOff)),index=range(lenKnockOff))
+    else : OUT = list(map(score_for_one_copy,range(lenKnockOff)))
 
     return OUT
 
