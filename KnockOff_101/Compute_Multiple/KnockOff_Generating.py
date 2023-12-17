@@ -263,6 +263,20 @@ from joblib import Parallel, delayed
 from ..Basics import _seed_sum
 
 
+#> random shuffle ................................................
+def _Shuffle(Z,is_Cat,n_Cols,rng):
+    col_ix = rng.choice(range(n_Cols),size=n_Cols,replace=False)
+    shuffled_Data = Z.iloc[:,col_ix]
+    is_Cat_similarly = is_Cat[col_ix]
+    return (shuffled_Data, is_Cat_similarly,col_ix)
+def _ShuffleBack(Zshuffled,Zshuffled_knockoff,col_ix):
+    inverse_ix = pd.Series(col_ix).sort_values().index
+    actualZ = Zshuffled.iloc[:,inverse_ix]
+    actualZ_knockoff = Zshuffled_knockoff.iloc[:,inverse_ix]
+    return (actualZ,actualZ_knockoff)
+# ................................................................
+
+
 
 def KnockOff_Reshuffled(X, is_Cat, scaling=False,
                         n_Blocks=3, n_parallel=1, seed_for_randomizing=None,
@@ -287,19 +301,6 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False,
    ## splitting blocks ----------------------------------------
     Blocks = list(KFold(n_Blocks,shuffle=True,random_state=seed_for_randomizing).split(X))
 
-   ## random shuffle ------------------------------------------
-    def Shuffle(Z,rng):
-        col_ix = rng.choice(range(p),size=p,replace=False)
-        shuffled_Data = Z.iloc[:,col_ix]
-        is_Cat_similarly = is_Cat[col_ix]
-        return (shuffled_Data, is_Cat_similarly,col_ix)
-    def ShuffleBack(Z,Z_knockoff,col_ix):
-        inverse_ix = pd.Series(col_ix).sort_values().index
-        actualZ = Z.iloc[:,inverse_ix]
-        actualZ_knockoff = Z_knockoff.iloc[:,inverse_ix]
-        return (actualZ,actualZ_knockoff)
-
-
    ## blockwise knockoff generation ---------------------------
     ORIGINALs = []
     KNOCKOFFs = []
@@ -307,9 +308,9 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False,
         generator_i = RNG(_seed_sum(seed_for_randomizing,i))
         ix = Blocks[i][1]
         Block = X.iloc[ix]
-        Block,is_Cat_i,col_ix = Shuffle(Block,generator_i)
+        Block,is_Cat_i,col_ix = _Shuffle(Block,is_Cat,p,generator_i)
         Block,Block_knockoff = method(Block,is_Cat_i,_seed_sum(seed_for_BaseMethod,i))
-        return ShuffleBack(Block,Block_knockoff,col_ix)
+        return _ShuffleBack(Block,Block_knockoff,col_ix)
 
     if n_parallel>1 : OUT = (Parallel(n_jobs=n_parallel,backend='loky')(delayed(blockwise_KnockOff)(i) for i in range(n_Blocks)))
     else : OUT = list(map(blockwise_KnockOff,range(n_Blocks)))
@@ -322,7 +323,6 @@ def KnockOff_Reshuffled(X, is_Cat, scaling=False,
     X = pd.DataFrame(pd.concat(ORIGINALs,axis=0),index=idx)
     X_knockoff = pd.DataFrame(pd.concat(KNOCKOFFs,axis=0),index=idx)
         # we want to recover both row order and column order
-
 
    ## KnockOff copy --------------------------------------------
     return tuple([X,X_knockoff])
