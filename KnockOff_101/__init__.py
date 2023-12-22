@@ -9,7 +9,8 @@ NOTE: Appending the "path/to/this/folder" to the sys.path() & Importing this 'Kn
                 2)  Compute_Multiple
                         *  KnockOff_Generating
                         *  Feature_Importance
-                3)  Derandomized_Decision
+                3)  Comparisons_and_checkQuality
+                        *
                 4)  Diagnostics
                 5)  Simulation_and_Visualization
 
