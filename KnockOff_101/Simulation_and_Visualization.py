@@ -8,7 +8,6 @@ Topic: Simulates random DataMatrix and Gives some visualization
 from .Basics import *
 
 
-
 #### Simulate Samples =========================================================
 
 def simulateIndependent(n_obs,col_type,
