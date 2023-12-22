@@ -39,7 +39,7 @@ def EnergyDistance_test(X1st,X1st_knockoff,X2nd,X2nd_knockoff,n_partialSwap=10,s
     result = [score_currentRHS(fullSwap_RHS,generator0)]
     result += list(map(lambda j: score_currentRHS(partialSwap(generator0),generator0),range(n_partialSwap)))
     result = np.array(result)
-    return (result[:,1].mean(),result[:,0].median())
+    return (result[:,1].mean(),np.median(result[:,0]))
 
 
 
