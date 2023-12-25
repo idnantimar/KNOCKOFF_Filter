@@ -37,7 +37,7 @@ def Cat_or_Num(X):
 ##
 #
 #### Scaling Data =============================================================
-def Scale_Numeric(X,is_Cat,return_scale=False):
+def Scale_Numeric(X,is_Cat):
     """ Scales the numerical columns of a data matrix , skips the categorical columns as it is.
         Do not return any new copy , but change the DataFrame in place.
     """
@@ -54,7 +54,16 @@ def Scale_Numeric(X,is_Cat,return_scale=False):
 ##
 #### Random Number ============================================================
 
-RNG = lambda seed=None: np.random.default_rng(seed) # RandomNumber_Generator
+def RNG(seed=None):
+    """ RandomNumber Generator with given seed"""
+    return np.random.default_rng(seed)
+
+def _make_rng(random_state):
+    # converts a seed to a generator
+    if isinstance(random_state,(np.random.Generator,np.random.RandomState)) :
+        return random_state
+    else : return np.random.default_rng(random_state)
+
 
 def _seed_sum(a,b):
     # useful for initializing seeds at None
