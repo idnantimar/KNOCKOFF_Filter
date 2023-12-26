@@ -5,6 +5,8 @@ Topic: My Template of Feature Importance
 @author: R.Nandi
 """
 
+from sklearnex import patch_sklearn
+patch_sklearn(verbose=0)
 
 
 #### My_Template ==============================================================
@@ -38,9 +40,10 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
     def __init__(self,random_state=None):
         self.random_state = random_state
 
-    def fit(self,X,y,copy=True):
+    def fit(self,X,y,y_classes=True):
         """
-        This is a basic fit method , computing two atributes 'n_features_in_' and 'feature_names_in_'.
+        This is a basic fit method , computing atributes 'n_features_in_', 'feature_names_in_',
+        'classes_', 'n_classes_'.
 
         (Override this with the actual implementation of required feature-importance technique ,
         that computes the attribute 'feature_importances_')
@@ -53,27 +56,18 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         y : array-like of shape (n_samples,)
             The target values.
 
-        copy : bool, default True
-            Whether to make a copy of X and y, such that
-            modifications to the data or indices of the copy will not be
-            reflected in the original object.
-
-        Returns
-        -------
-        X : A copy of X when copy=True, otherwise X
-
-        y : A copy of y when copy=True, otherwise y
+        y_classes : bool, default True
+            Whether to obtain 'classes_' and 'n_classes_' for classification problems.
 
         """
-        if copy : ## to prevent any accidental change in original data
-            X = X.copy()
-            y = y.copy()
         if hasattr(self,'feature_importances_') :
             delattr(self,'feature_importances_')
                 ## delete 'feature_importances_' from previous fit
         self.n_features_in_ = getattr(X,'shape')[1]
         self.feature_names_in_ = getattr(X,'columns',None)
-        return X,y
+        if y_classes :
+            self.classes_ = np.unique(y)
+            self.n_classes_ = len(self.classes_)
 
     def _get_support_mask(self):
         """
@@ -188,6 +182,8 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
                                                zero_division=np.nan)
                 ## this confusion matrix or f1 score corresponds to the labelling of
                  ## null/non-null features, not corresponds to the labelling of target(y) classes
+
+
 
 
 
