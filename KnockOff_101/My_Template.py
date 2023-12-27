@@ -24,6 +24,12 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
     """
         A common template for all the feature-importance techniques under this projectwork.
 
+        Parameters
+        ----------
+        random_state : int , default None
+            Seed for reproducible results across multiple function calls.
+
+
         Attributes
         ----------
         threshold : float , default 0
@@ -143,7 +149,7 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
 
 
     def get_error_rates(self):
-        """
+       """
         This function computes attributes 'pfer_', 'pcer_', 'fdr_', 'false_discoveries_' ,
         'minimum_model_size_','tpr_','n_false_negatives_', 'confusion_matrix_for_features_',
         'f1_score_for_features_' assuming there is an attribute 'true_support'.
@@ -151,9 +157,11 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         (Override this with the actual implementation of computing 'true_support',
         based on the true model coefficients input, if known)
 
+
         Returns
         -------
-        None.
+        dict
+            Conatins various error rates PCER,FDR,PFER,TPR.
 
         """
         compare_truth = (np.array(self.true_support,dtype=int)-self.support_)
