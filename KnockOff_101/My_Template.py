@@ -100,7 +100,7 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         self.n_features_ = self.support_.sum()
         return self.support_
 
-    def plot(self,sort=True,kind='bar',ax=None,
+    def plot(self,sort=True,*,kind='bar',ax=None,
              xlabel='features',ylabel=None,title=None,rot=30,color=['green','red'],**kwargs):
         """
         Make plot of 'feature_importances_'.
@@ -182,8 +182,10 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
                                                zero_division=np.nan)
                 ## this confusion matrix or f1 score corresponds to the labelling of
                  ## null/non-null features, not corresponds to the labelling of target(y) classes
-
-
+        return {'PCER':self.pcer_,
+                'FDR':self.fdr_,
+                'PFER':self.pfer_,
+                'TPR':self.tpr_}
 
 
 
