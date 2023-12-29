@@ -17,6 +17,10 @@ from sklearn.base import BaseEstimator,check_is_fitted
 from sklearn.feature_selection import SelectorMixin
 from scipy.stats import rankdata
 from sklearn.metrics import precision_score,recall_score,f1_score,confusion_matrix,ConfusionMatrixDisplay
+import joblib, os
+from datetime import datetime
+
+
 
 
 
@@ -30,29 +34,32 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
             Seed for reproducible results across multiple function calls.
 
 
-        Attributes
-        ----------
-        threshold : float , default 0
+        Class Variables
+        ---------------
+        threshold : 0
             A cut-off, any feature with importance exceeding this value will be selected,
             otherwise will be rejected.
 
-        max_features : int , default None
+        max_features : None
             The maximum possible number of selection. None implies no constrain,
-            otherwise the 'threshold' will be updated automatically if it attempts to
-            select more than 'max_features'.
+            otherwise the `threshold` will be updated automatically if it attempts to
+            select more than `max_features`.
+
     """
     threshold = 0
     max_features = None
     def __init__(self,random_state=None):
         self.random_state = random_state
 
-    def fit(self,X,y,y_classes=True):
-        """
-        This is a basic fit method , computing atributes 'n_features_in_', 'feature_names_in_',
-        'classes_', 'n_classes_'.
 
-        (Override this with the actual implementation of required feature-importance technique ,
-        that computes the attribute 'feature_importances_')
+
+    def fit(self,X,y,*,y_classes=True):
+        """
+        This is a basic ``fit`` method , computing atributes `n_samples_`,`n_features_in_`, `feature_names_in_`,
+        `classes_`, `n_classes_`.
+
+        [ Override this with the actual implementation of required feature-importance technique ,
+        that computes the attribute `feature_importances_` ]
 
         Parameters
         ----------
@@ -62,18 +69,20 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         y : array-like of shape (n_samples,)
             The target values.
 
-        y_classes : bool, default True
-            Whether to obtain 'classes_' and 'n_classes_' for classification problems.
+        y_classes : bool , default True
+            Whether to obtain `classes_` and `n_classes_` for classification problems.
 
         """
         if hasattr(self,'feature_importances_') :
             delattr(self,'feature_importances_')
                 ## delete 'feature_importances_' from previous fit
-        self.n_features_in_ = getattr(X,'shape')[1]
+        self.n_samples_,self.n_features_in_ = getattr(X,'shape')
         self.feature_names_in_ = getattr(X,'columns',None)
         if y_classes :
             self.classes_ = np.unique(y)
             self.n_classes_ = len(self.classes_)
+
+
 
     def _get_support_mask(self):
         """
@@ -84,6 +93,7 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         support : boolean array of shape (n_features,)
             An element is True iff its corresponding feature is selected for
             retention.
+
         """
         check_is_fitted(self,attributes="feature_importances_",
                         msg="The %(name)s instance must have a 'feature_importances_' attribute.")
@@ -103,18 +113,30 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
                  ## by a given constant
         self.support_ = (self.feature_importances_ >= self.threshold_)
         self.ranking_ = ranking_
-        self.n_features_ = self.support_.sum()
+        self.n_features_selected_ = self.support_.sum()
         return self.support_
 
-    def plot(self,sort=True,*,kind='bar',ax=None,
+
+
+    def plot(self,sort=True,savefig=None,*,kind='bar',ax=None,
              xlabel='features',ylabel=None,title=None,rot=30,color=['green','red'],**kwargs):
         """
-        Make plot of 'feature_importances_'.
+        Make plot of `feature_importances_`.
+
+        Colour Code :
+
+            color[0](default 'green') is selected,
+            color[1](default 'red') is rejected,
+            (a stripe on colour implies false selection/rejection , when `true_support` is known).
 
         Parameters
         ----------
         sort : bool, default True
-            Whether to sort the features according to 'feature_importances_' before plotting.
+            Whether to sort the features according to `feature_importances_` before plotting.
+
+        savefig : "directory/for/saving/your_plot"
+            default None, implies plot will not be saved. True will save the plot inside a folder PLOTs at the current working directory.
+            The plot will be saved as self.__class__.__name__-datetime.now().strftime('%Y_%m_%d_%H%M%S%f').png
 
         kind, ax, xlabel, ylabel, title, rot, color, **kwargs : keyword arguments to pass to matplotlib plotting method.
 
@@ -126,7 +148,7 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
         if ylabel is None :
             ylabel = self.__class__.__name__
         if title is None :
-            title = "selected : " + str(self.n_features_) +"/" + str(self.n_features_in_)
+            title = "selected : " + str(self.n_features_selected_) +"/" + str(self.n_features_in_)
         imp = pd.Series(self.feature_importances_,index=ix)
         colors = np.array([(color[0] if val else color[1]) for val in self.support_])
         truth_known = hasattr(self,'true_support')
@@ -142,21 +164,26 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
                  color=colors,hatch=hatch_patterns,**kwargs)
                 ## in default plots, red: rejected, green: selected , stripe: false +-
         plt.axhline(self.threshold_,color='black',linestyle='dashed')
+        if savefig is not None :
+            if savefig==True :
+                os.makedirs('PLOTs',exist_ok=True)
+                savefig = 'PLOTs'
+            plt.savefig(os.path.join(savefig,
+                                     f"{self.__class__.__name__}-{datetime.now().strftime('%Y_%m_%d_%H%M%S%f')}.png"))
         plt.show()
-        if truth_known :
-            ConfusionMatrixDisplay(self.confusion_matrix_for_features_,
-                                   display_labels=['null','non-null']).plot(colorbar=False)
 
 
-    def get_error_rates(self):
-       """
-        This function computes attributes 'pfer_', 'pcer_', 'fdr_', 'false_discoveries_' ,
-        'minimum_model_size_','tpr_','n_false_negatives_', 'confusion_matrix_for_features_',
-        'f1_score_for_features_' assuming there is an attribute 'true_support'.
 
-        (Override this with the actual implementation of computing 'true_support',
-        based on the true model coefficients input, if known)
+    def get_error_rates(self,*,plot=False):
+        """
+        This function computes attributes `pfer_`, `pcer_`, `fdr_`, `false_discoveries_`,
+        `minimum_model_size_`, `tpr_`, `n_false_negatives_`, `confusion_matrix_for_features_`,
+        `f1_score_for_features_` assuming there is an attribute `true_support`.
 
+        Can plot the `confusion_matrix_for_features_`.
+
+        [ Override this with the actual implementation of computing `true_support`,
+        based on the true model coefficients input, if known ]
 
         Returns
         -------
@@ -190,6 +217,9 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
                                                zero_division=np.nan)
                 ## this confusion matrix or f1 score corresponds to the labelling of
                  ## null/non-null features, not corresponds to the labelling of target(y) classes
+        if plot :
+            ConfusionMatrixDisplay(self.confusion_matrix_for_features_,
+                                   display_labels=['null','non-null']).plot(colorbar=False)
         return {'PCER':self.pcer_,
                 'FDR':self.fdr_,
                 'PFER':self.pfer_,
@@ -197,5 +227,36 @@ class My_Template_FeatureImportance(SelectorMixin,BaseEstimator):
 
 
 
-# *****************************************************************************
+    def dump_to_file(self,file_path=None):
+        """
+        Save this current instance to a specified file location.
+
+        It can be loaded later as follows-
+
+        >>> with open('your_saved_instance.pkl', 'rb') as file:
+        ...:     loaded_instance = joblib.load(file)
+        >>> loaded_instance
+
+        Parameters
+        ----------
+        file_path : "path/to/your_file" with a trailing .pkl
+            The default is None, which will save the file at the current working directory as self.__class__.__name__-datetime.now().strftime('%Y_%m_%d_%H%M%S%f').pkl
+
+        """
+        if file_path is None :
+            file_path = os.path.join(os.getcwd(),
+                                     f"{self.__class__.__name__}-{datetime.now().strftime('%Y_%m_%d_%H%M%S%f')}.pkl")
+        if os.path.exists(file_path):
+            user_input = input(f"File '{file_path}' already exists.\n Do you want to overwrite it? (YES/no): ").upper()
+            if user_input != 'YES':
+                print("Continue with a different filename.")
+                return
+        with open(file_path, 'wb') as file:
+            joblib.dump(self, file)
+        print(f"Instance saved as {file_path} successfully...")
+
+
+
+
+#### ==========================================================================
 
