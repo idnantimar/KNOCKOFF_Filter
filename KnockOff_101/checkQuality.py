@@ -1,7 +1,7 @@
 """
 Created on Tue Sep 19 23:16:49 2023
 
-Topic: Checking the quality of knockoff and Comparisons with various other methods.
+Topic: Checking the quality of knockoff.
 @author: R.Nandi
 """
 
